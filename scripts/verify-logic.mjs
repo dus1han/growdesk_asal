@@ -25,10 +25,13 @@ const {
   buildFilename,
   formatTimestamp,
   normalizeSelection,
-  buildLeadRow,
+  buildLead,
   toIsoWithOffset,
   isConfigured,
   DEFAULT_SETTINGS,
+  getDestination,
+  DESTINATIONS,
+  originPatternFor,
 } = mod;
 
 const session = (fields) => ({ active: true, source: 'WhatsApp', ...fields });
@@ -133,15 +136,15 @@ check('Selection normalisation stays minimal', () => {
   assert.equal(normalizeSelection('name', '   '), '');
 });
 
-check('Sheet row carries an unambiguous ISO timestamp', () => {
+check('Lead carries an unambiguous ISO timestamp', () => {
   const iso = toIsoWithOffset(new Date(2026, 8, 29, 13, 52, 56));
   // Local offset varies by machine; assert shape and the local wall-clock part.
   assert.match(iso, /^2026-09-29T13:52:56(Z|[+-]\d{2}:\d{2})$/);
   assert.equal(new Date(iso).getTime(), new Date(2026, 8, 29, 13, 52, 56).getTime());
 });
 
-check('Sheet row maps every field, blanks for missing', () => {
-  const row = buildLeadRow(
+check('Lead maps every field, blanks for missing', () => {
+  const row = buildLead(
     session({ name: 'John Fernando', instagramName: '@johnfernando', source: 'Instagram' }),
     new Date(2026, 8, 29, 13, 52, 56),
     'Reception PC',
@@ -154,17 +157,61 @@ check('Sheet row maps every field, blanks for missing', () => {
   assert.equal(row.capturedAtLocal, '2026-09-29 13:52:56');
 });
 
-check('Only a real Apps Script /exec URL counts as configured', () => {
+check('An endpoint is required, and must be https', () => {
   assert.equal(isConfigured(DEFAULT_SETTINGS), false);
-  assert.equal(isConfigured({ ...DEFAULT_SETTINGS, webAppUrl: 'https://example.com/exec' }), false);
-  assert.equal(
-    isConfigured({ ...DEFAULT_SETTINGS, webAppUrl: 'http://script.google.com/macros/s/AK/exec' }),
-    false,
+  assert.equal(isConfigured({ ...DEFAULT_SETTINGS, endpointUrl: 'not a url' }), false);
+  assert.equal(isConfigured({ ...DEFAULT_SETTINGS, endpointUrl: 'http://crm.example.com/leads' }), false);
+  assert.equal(isConfigured({ ...DEFAULT_SETTINGS, endpointUrl: 'https://crm.example.com/leads' }), true);
+});
+
+check('A token without a header name is rejected', () => {
+  const base = { ...DEFAULT_SETTINGS, endpointUrl: 'https://crm.example.com/leads' };
+  assert.equal(isConfigured({ ...base, authToken: 'abc', authHeaderName: '' }), false);
+  assert.equal(isConfigured({ ...base, authToken: 'abc', authHeaderName: 'X-API-Key' }), true);
+});
+
+check('Destination registry resolves, and falls back safely', () => {
+  assert.ok(DESTINATIONS.length >= 1);
+  assert.equal(getDestination('webhook').id, 'webhook');
+  // An unknown id must not throw - settings can outlive a removed adapter.
+  assert.equal(getDestination('no-such-destination').id, 'webhook');
+});
+
+check('Adapter builds the request the CRM will receive', () => {
+  const d = getDestination('webhook');
+  const lead = buildLead(
+    session({ name: 'John Fernando', number: '+94 77 123 4567' }),
+    new Date(2026, 8, 29, 13, 52, 56),
+    'Reception PC',
   );
-  assert.equal(
-    isConfigured({ ...DEFAULT_SETTINGS, webAppUrl: 'https://script.google.com/macros/s/AKfy123/exec' }),
-    true,
-  );
+  const req = d.buildRequest(lead, {
+    endpointUrl: 'https://crm.example.com/leads',
+    authHeaderName: 'X-API-Key',
+    authToken: 'secret-token',
+  });
+  assert.equal(req.url, 'https://crm.example.com/leads');
+  assert.equal(req.init.method, 'POST');
+  assert.equal(req.init.headers['X-API-Key'], 'secret-token');
+  assert.equal(req.init.headers['Content-Type'], 'application/json');
+  assert.equal(JSON.parse(req.init.body).lead.number, '+94 77 123 4567');
+});
+
+check('Adapter reads HTTP status codes usefully', () => {
+  const d = getDestination('webhook');
+  assert.equal(d.interpretResponse(200, 'ok').ok, true);
+  assert.equal(d.interpretResponse(201, '').ok, true);
+  assert.equal(d.interpretResponse(401, '').ok, false);
+  assert.match(d.interpretResponse(401, '').error, /credential/i);
+  assert.match(d.interpretResponse(404, '').error, /not found/i);
+  assert.match(d.interpretResponse(500, 'boom').error, /500.*boom/);
+});
+
+check('Origin pattern is derived for permission requests', () => {
+  assert.equal(originPatternFor('https://crm.example.com/leads?x=1'), 'https://crm.example.com/*');
+  assert.equal(originPatternFor('https://crm.example.com:8443/x'), 'https://crm.example.com:8443/*');
+  // http and junk must never produce a pattern to request.
+  assert.equal(originPatternFor('http://crm.example.com/leads'), null);
+  assert.equal(originPatternFor('nonsense'), null);
 });
 
 for (const [status, name] of results) console.log(`${status}  ${name}`);

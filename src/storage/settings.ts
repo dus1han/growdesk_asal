@@ -1,24 +1,29 @@
+import { DEFAULT_DESTINATION_ID, getDestination } from '../destinations';
+
 /**
- * User settings for the Google Sheet push. Kept in chrome.storage.local so the
- * endpoint is configured at runtime rather than baked into the build - the
- * Web App URL is effectively a write credential and must not live in source.
+ * Where leads are sent, configured at runtime rather than baked into the
+ * build - the endpoint and token together are a write credential.
  */
 export interface Settings {
-  /** Apps Script Web App /exec URL. */
-  webAppUrl: string;
-  /** Shared secret checked by the Apps Script before it appends a row. */
-  sharedSecret: string;
+  /** Which destination adapter to use. See src/destinations/index.ts. */
+  destinationId: string;
+  endpointUrl: string;
+  /** Header carrying the credential, e.g. "Authorization". */
+  authHeaderName: string;
+  authToken: string;
   /** Optional label identifying which PC a lead came from. */
   deviceLabel: string;
-  /** Also download the TXT file on STOP. Off by default: sheet-only. */
+  /** Also download a TXT copy on STOP. Off by default. */
   alsoSaveTxt: boolean;
 }
 
 const KEY = 'crm-capture-settings';
 
 export const DEFAULT_SETTINGS: Settings = {
-  webAppUrl: '',
-  sharedSecret: '',
+  destinationId: DEFAULT_DESTINATION_ID,
+  endpointUrl: '',
+  authHeaderName: 'Authorization',
+  authToken: '',
   deviceLabel: '',
   alsoSaveTxt: false,
 };
@@ -43,7 +48,13 @@ export async function writeSettings(settings: Settings): Promise<boolean> {
   }
 }
 
-/** True when enough is configured to attempt a push. */
+/** True when the selected destination considers the settings usable. */
 export function isConfigured(settings: Settings): boolean {
-  return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/.test(settings.webAppUrl.trim());
+  return (
+    getDestination(settings.destinationId).validate({
+      endpointUrl: settings.endpointUrl,
+      authHeaderName: settings.authHeaderName,
+      authToken: settings.authToken,
+    }) === null
+  );
 }

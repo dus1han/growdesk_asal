@@ -108,7 +108,7 @@ function App({ platform }: { platform: Platform }) {
     }
 
     setBusy(true);
-    showPending('Saving to Google Sheet…');
+    showPending('Sending to CRM…');
     const response = await sendSave();
 
     // The worker builds the optional TXT copy; only the page can download it.
@@ -124,12 +124,12 @@ function App({ platform }: { platform: Platform }) {
 
     if (!response.ok) {
       // Session is deliberately kept so STOP can simply be pressed again.
-      showFlash(response.error ?? 'Could not save to the sheet. Press STOP to retry.', 'error');
+      showFlash(response.error ?? 'Could not send to the CRM. Press STOP to retry.', 'error');
       return;
     }
 
     setSession(null);
-    showFlash('✓ Lead saved to Google Sheet');
+    showFlash('✓ Lead sent to CRM');
   }, [session, showFlash, showPending]);
 
   return (

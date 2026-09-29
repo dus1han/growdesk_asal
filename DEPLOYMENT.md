@@ -41,34 +41,66 @@ be added to policy; that is the only route.
 
 The user presses **START** in a toolbar shown on WhatsApp Web / Instagram,
 highlights a piece of text, right-clicks, and assigns it as Name, Number, or
-Instagram Name. Pressing **STOP** writes those fields to a local `.txt` file in
-the user's Downloads folder and clears the session.
+Instagram Name. Pressing **STOP** sends those fields to the configured CRM
+endpoint and clears the session. If the send fails, the capture is kept so the
+user can retry — it is never silently discarded.
 
 ## Security profile
 
-- **No network access of any kind.** The extension makes no `fetch`, no `XHR`,
-  no WebSocket, and no external requests. It has no API, no backend, no CRM or
-  Zoho integration, no authentication, and no telemetry.
+> **Changed in 0.3.0.** Earlier versions made no network requests at all. This
+> version sends each captured lead to one CRM endpoint. Please re-review.
+
+- **Outbound data: one endpoint, chosen by the user.** On STOP, the extension
+  POSTs a single JSON record to an HTTPS endpoint the user configures in the
+  extension's options page. It has no backend of its own, no telemetry, and no
+  other outbound traffic. Nothing is transmitted until an endpoint is set.
+- **The endpoint's origin is not pre-granted.** The manifest declares no CRM
+  host. The user must approve the specific origin through Chrome's own
+  permission prompt before any request can be made; until then the extension
+  refuses to send and says so. See "Restricting the endpoint" below if you want
+  that choice taken away from the user.
+- **What is transmitted:** captured-at timestamp, Name, Number, Instagram Name,
+  the source site (WhatsApp or Instagram), and an optional device label. Nothing
+  else — no page content, no conversation data, no browsing history.
 - **No page scraping.** It reads only text the user has deliberately highlighted
   and explicitly assigned via the right-click menu. It does not read
   conversations, contacts, or page content. Its `MutationObserver` watches only
   the direct children of `<html>`, solely to keep its own toolbar attached
   during single-page-app navigation.
-- **No persistent storage.** Capture state lives in `chrome.storage.session`,
-  which is memory-backed and cleared when the browser closes.
-- **Output is local only** — a `.txt` file the user downloads.
+- **No persistent storage of leads.** Capture state lives in
+  `chrome.storage.session`, which is memory-backed and cleared when the browser
+  closes. The endpoint URL and credential live in `chrome.storage.local`.
+- **Credential handling.** The endpoint URL and token are entered by the user
+  and stored locally. They are never compiled into the build and never appear
+  in the packaged `.crx`.
+
+### Restricting the endpoint
+
+If leads should only ever reach one approved system, do not rely on the user
+choosing correctly. Use the `ExtensionSettings` policy to pin the extension's
+runtime host access:
+
+```
+"runtime_blocked_hosts": ["*://*/*"],
+"runtime_allowed_hosts": ["*://crm.your-company.com"]
+```
+
+That makes any other endpoint unreachable regardless of what the user types.
 
 ### Permissions requested
 
-| Permission | Why |
-| --- | --- |
-| `storage` | Hold the in-progress capture in session memory across service-worker restarts |
-| `contextMenus` | Add the "CRM Capture" right-click entries |
-| `https://web.whatsapp.com/*` | Show the toolbar on WhatsApp Web |
-| `https://www.instagram.com/*` | Show the toolbar on Instagram |
+| Permission | Type | Why |
+| --- | --- | --- |
+| `storage` | required | Hold the in-progress capture, and the user's endpoint settings |
+| `contextMenus` | required | Add the "CRM Capture" right-click entries |
+| `https://web.whatsapp.com/*` | required host | Show the toolbar on WhatsApp Web |
+| `https://www.instagram.com/*` | required host | Show the toolbar on Instagram |
+| `https://*/*` | **optional** host | Not granted at install. The user grants only their CRM's origin, via Chrome's prompt, when they save it in options |
 
 No `<all_urls>`, no `downloads`, no `tabs`, no `webRequest`, no `scripting`,
-no `cookies`, no `nativeMessaging`. Host access is limited to those two domains.
+no `cookies`, no `nativeMessaging`. The two site hosts are the only hosts
+granted at install time; anything else requires an explicit user grant, and can
+be constrained by policy as shown above.
 
 ## Deployment route: Option B (selected)
 
@@ -141,5 +173,6 @@ gitignored and should be stored in the team's secret manager.
 
 ## Scope
 
-This is a prototype for evaluation. It deliberately contains no CRM
-integration, no Zoho integration, no external API, no database, and no login.
+This is a prototype for evaluation. It has no backend, no database and no
+login. It delivers leads to a single user-configured HTTPS endpoint and does
+nothing else over the network.

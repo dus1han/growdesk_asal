@@ -15,7 +15,8 @@ import { ensureMenus, FIELD_MENU_IDS, setMenusVisible } from './contextMenus';
 import { FIELD_LABEL, normalizeSelection } from '../utils/normalize';
 import { platformFromUrl } from '../utils/platform';
 import { isConfigured, readSettings } from '../storage/settings';
-import { buildLeadRow, pushLead } from '../utils/sheets';
+import { buildLead } from '../types/lead';
+import { pushToDestination } from '../utils/push';
 import { buildFilename, buildTxt } from '../utils/txtExporter';
 import { canSave } from '../types/capture';
 
@@ -191,9 +192,10 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendRespo
 });
 
 /**
- * Pushes the tab's capture to the Google Sheet and, only on success, ends the
- * session. A failed push keeps everything so the user can press STOP again -
- * sheet-only saving must never silently discard a lead.
+ * Sends the tab's capture to the configured destination and, only on success,
+ * ends the session. A failed push keeps everything so the user can press STOP
+ * again - with no local copy by default, saving must never silently discard a
+ * lead.
  */
 async function saveLead(tabId: number): Promise<SaveResponse> {
   const session = await readSession(tabId);
@@ -205,13 +207,13 @@ async function saveLead(tabId: number): Promise<SaveResponse> {
   if (!isConfigured(settings)) {
     return {
       ok: false,
-      error: 'No Google Sheet configured. Open the extension options to set it up.',
+      error: 'No CRM endpoint configured. Open the extension options to set it up.',
     };
   }
 
   const capturedAt = new Date();
-  const lead = buildLeadRow(session, capturedAt, settings.deviceLabel);
-  const result = await pushLead(settings, { lead });
+  const lead = buildLead(session, capturedAt, settings.deviceLabel);
+  const result = await pushToDestination(settings, { lead });
 
   // The optional TXT is a belt-and-braces copy, produced either way so a
   // failed push never leaves the user with nothing.

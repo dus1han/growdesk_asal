@@ -3,9 +3,9 @@
 Chrome Manifest V3 extension that captures lead details from text you highlight
 on **WhatsApp Web** and **Instagram**, and saves them to a local `.txt` file.
 
-This is a test/prototype build. It has **no CRM, no Zoho, no API, no login, and
-sends no data anywhere**. Everything stays in the browser session; the TXT file
-is the only output.
+This is a test/prototype build. It has no backend, no database and no login.
+On STOP it sends one JSON record to an HTTPS endpoint you configure in the
+extension's options page — nothing is sent anywhere until you set one.
 
 ## Workflow
 
