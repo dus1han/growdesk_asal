@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "CRM Capture (Prototype)",
+  "version": "0.2.0",
+  "description": "Highlight text on WhatsApp Web or Instagram, right-click to capture Name / Number / Insta Name, then STOP to save the lead to your Google Sheet.",
+  "permissions": [
+    "storage",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://www.instagram.com/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://web.whatsapp.com/*",
+        "https://www.instagram.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "CRM Capture (Prototype)",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAj/f/QaSybxUNgTOSBUH5t64td9+MXHDOCSHhQDA1bUQ0dEJ9uOUVXNeIfQYk1ptmJCUXq/r18kfIqugrMu/Nze85Io08aQQri3jinMiFSyaIRpwzWaRT4z/DnLH6W6uVqPX/+gCaQGzq6Zt/6zCXx1p09qH/khJmZAIJgezJUK3jxZ5TC+mD3cd+LwL7HnBIsFoEs2UX81kGPxcgMtBW7Msw+SHDGPKZwDabkt/yck5OBML3wOXsVcDNta2GHjF8MAvVV3DBZCObfBphePuG9fXwS8nG8axY+boBckPn3J1ajhIYTOK3AvkbcOx1XsZRkfrOuS8fVaEBPO1adKpl2QIDAQAB"
+}

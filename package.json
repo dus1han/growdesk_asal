@@ -1,0 +1,36 @@
+{
+  "name": "crm-capture-extension",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Prototype Chrome MV3 extension that captures Name / Number / Instagram Name from highlighted text on WhatsApp Web and Instagram, and pushes each lead to a Google Sheet.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && npm run verify && node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "clean": "node scripts/build.mjs --clean-only",
+    "verify": "node scripts/verify-logic.mjs",
+    "pack": "npm run build && node scripts/pack.mjs",
+    "key": "node scripts/make-key.mjs",
+    "deploy": "npm run pack && node scripts/deploy.mjs",
+    "browser:install": "npx --yes @puppeteer/browsers install chrome@stable --path .browser",
+    "start": "npm run build && node scripts/run-chrome.mjs",
+    "verify:ui": "node scripts/verify-toolbar.mjs",
+    "verify:layout": "node scripts/verify-layout.mjs",
+    "verify:e2e": "node scripts/verify-e2e.mjs",
+    "serve": "node scripts/serve.mjs",
+    "release": "npm run build && node scripts/release.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}

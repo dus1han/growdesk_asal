@@ -1,0 +1,10 @@
+node_modules/
+dist/
+public/icons/
+*.log
+key.pem
+*.crx
+update.xml
+deploy/
+.browser/
+release/

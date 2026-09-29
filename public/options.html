@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CRM Capture — Settings</title>
+    <style>
+      :root { color-scheme: light dark; --bg:#fff; --fg:#1c2430; --muted:#6b7686; --line:#e2e6ec; --accent:#1a6dd6; --ok:#10793f; --err:#c62f38; --field:#fff; }
+      @media (prefers-color-scheme: dark) { :root { --bg:#161b22; --fg:#e6eaf0; --muted:#8b95a4; --line:#2a323d; --accent:#3b82f6; --ok:#3fb768; --err:#e5484d; --field:#0f141a; } }
+      * { box-sizing: border-box; }
+      body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+      .wrap { max-width: 640px; margin: 0 auto; padding: 32px 20px 56px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      .sub { color: var(--muted); margin: 0 0 28px; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing:.06em; color: var(--muted); margin: 28px 0 12px; }
+      label { display:block; font-weight:600; margin-bottom:6px; }
+      .hint { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; }
+      input[type=text], input[type=password] { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:6px; background:var(--field); color:var(--fg); font:inherit; font-size:13px; }
+      input:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:transparent; }
+      .field { margin-bottom: 18px; }
+      .check { display:flex; gap:10px; align-items:flex-start; }
+      .check input { margin-top:3px; }
+      .check label { font-weight:600; margin:0; }
+      .optional { font-weight:400; color:var(--muted); }
+      .row { display:flex; gap:10px; align-items:center; margin-top:24px; flex-wrap:wrap; }
+      button { appearance:none; border:0; border-radius:6px; padding:9px 18px; font:inherit; font-weight:600; font-size:13px; cursor:pointer; background:var(--accent); color:#fff; }
+      button.secondary { background:transparent; color:var(--accent); border:1px solid var(--line); }
+      button:disabled { opacity:.55; cursor:not-allowed; }
+      #status { min-height:20px; font-size:13px; font-weight:500; }
+      #status.ok { color:var(--ok); } #status.err { color:var(--err); } #status.info { color:var(--muted); }
+      ol { padding-left: 20px; color: var(--muted); font-size: 13px; }
+      ol li { margin-bottom: 6px; }
+      code { background: var(--field); border:1px solid var(--line); border-radius:4px; padding:1px 5px; font-size:12px; }
+      hr { border:0; border-top:1px solid var(--line); margin:32px 0 0; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>CRM Capture</h1>
+      <p class="sub">Send captured leads to a Google Sheet.</p>
+
+      <h2>Google Sheet connection</h2>
+
+      <div class="field">
+        <label for="url">Apps Script Web App URL</label>
+        <input id="url" type="text" spellcheck="false" placeholder="https://script.google.com/macros/s/.../exec" />
+        <p class="hint">Ends in <code>/exec</code>. Created when you deploy the script on your sheet — see setup below.</p>
+      </div>
+
+      <div class="field">
+        <label for="secret">Shared secret</label>
+        <input id="secret" type="password" spellcheck="false" autocomplete="off" />
+        <p class="hint">Must match <code>SHARED_SECRET</code> in the Apps Script. Without it, anyone holding the URL could write to your sheet.</p>
+      </div>
+
+      <div class="field">
+        <label for="device">Device label <span class="optional">(optional)</span></label>
+        <input id="device" type="text" spellcheck="false" placeholder="e.g. Reception PC" />
+        <p class="hint">Written to the sheet so you can tell which machine a lead came from.</p>
+      </div>
+
+      <div class="field check">
+        <input id="txt" type="checkbox" />
+        <div>
+          <label for="txt">Also download a TXT copy</label>
+          <p class="hint">Off by default. Turn on to keep a local file as well — a safety net if the sheet is unreachable.</p>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="save">Save</button>
+        <button id="test" class="secondary">Test connection</button>
+        <span id="status" role="status" aria-live="polite"></span>
+      </div>
+
+      <hr />
+      <h2>Setup</h2>
+      <ol>
+        <li>Open the Google Sheet. You need <strong>Edit</strong> access — view-only will not work.</li>
+        <li><strong>Extensions → Apps Script</strong>.</li>
+        <li>Replace the contents of <code>Code.gs</code> with the script from <code>apps-script/Code.gs</code>, and set your own <code>SHARED_SECRET</code>.</li>
+        <li><strong>Deploy → New deployment → Web app</strong>. Execute as <em>Me</em>; Who has access <em>Anyone</em>.</li>
+        <li>Copy the <code>/exec</code> URL into the field above, paste the same secret, then press <strong>Test connection</strong>.</li>
+      </ol>
+    </div>
+    <script src="options.js"></script>
+  </body>
+</html>
