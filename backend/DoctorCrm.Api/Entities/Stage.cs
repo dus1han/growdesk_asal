@@ -1,6 +1,6 @@
 namespace DoctorCrm.Api.Entities;
 
-public class Stage : AuditableEntity
+public class Stage : AuditableEntity, ILookupEntity, IHasColor
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;

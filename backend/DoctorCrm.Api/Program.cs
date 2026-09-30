@@ -100,15 +100,22 @@ builder.Services.AddRateLimiter(o =>
         await ctx.HttpContext.Response.WriteAsJsonAsync(
             ApiResponse.Fail("Too many attempts. Please wait a minute and try again."), ct);
 
+    // Login attempts per IP per minute (RateLimiting:LoginPerMinute, default 10).
+    var loginPermits = builder.Configuration.GetValue("RateLimiting:LoginPerMinute", 10);
     o.AddPolicy(RateLimitPolicies.Login, http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = loginPermits, Window = TimeSpan.FromMinutes(1) }));
 });
 
 // ---- Application services ------------------------------------------------------
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped(typeof(LookupService<>));
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<CustomFieldService>();
+builder.Services.AddScoped<CaptureConfigService>();
+builder.Services.AddScoped<SettingsService>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 builder.Services.AddControllers(o => o.Filters.Add<ValidationFilter>())

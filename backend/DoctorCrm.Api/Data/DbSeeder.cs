@@ -17,6 +17,11 @@ public class DbSeeder(AppDbContext db, IConfiguration config, ILogger<DbSeeder> 
         await SeedPermissionsAndRolesAsync(ct);
         await SeedStagesAsync(ct);
         await SeedTreatmentsAsync(ct);
+        await SeedListAsync(db.LeadSources, ["Instagram", "WhatsApp", "Facebook", "Website", "Referral", "Walk-in"], ct);
+        await SeedListAsync(db.CancellationReasons,
+            ["Customer request", "Booked elsewhere", "No longer interested", "Doctor unavailable", "Other"], ct);
+        await SeedListAsync(db.PaymentMethods, ["Cash", "Card", "Bank Transfer", "Other"], ct);
+        await SeedCaptureFieldsAsync(ct);
         await SeedSettingsAsync(ct);
         await SeedAdminAsync(ct);
     }
@@ -87,6 +92,34 @@ public class DbSeeder(AppDbContext db, IConfiguration config, ILogger<DbSeeder> 
         for (var i = 0; i < names.Length; i++)
             db.Treatments.Add(new Treatment { Name = names[i], DisplayOrder = i + 1 });
 
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Seeds a simple list only when it is empty, so admin edits are never overwritten.</summary>
+    private async Task SeedListAsync<T>(DbSet<T> set, string[] names, CancellationToken ct) where T : class, ILookupEntity, new()
+    {
+        if (await set.AnyAsync(ct)) return;
+        for (var i = 0; i < names.Length; i++)
+            set.Add(new T { Name = names[i], IsActive = true, DisplayOrder = i + 1 });
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Adds a row for any built-in capture field that doesn't have one yet.</summary>
+    private async Task SeedCaptureFieldsAsync(CancellationToken ct)
+    {
+        var existing = await db.CaptureFieldConfigurations.Select(c => c.FieldKey).ToListAsync(ct);
+        var order = await db.CaptureFieldConfigurations.MaxAsync(c => (int?)c.DisplayOrder, ct) ?? 0;
+        foreach (var f in CaptureFields.BuiltIns.Where(b => !existing.Contains(b.Key)))
+        {
+            db.CaptureFieldConfigurations.Add(new CaptureFieldConfiguration
+            {
+                FieldKey = f.Key,
+                IsEnabled = f.DefaultEnabled,
+                IsRequired = f.DefaultRequired,
+                DisplayOrder = ++order,
+                UpdatedAt = DateTime.UtcNow,
+            });
+        }
         await db.SaveChangesAsync(ct);
     }
 

@@ -1,0 +1,254 @@
+using System.Net;
+using System.Net.Http.Json;
+using DoctorCrm.Api.DTOs;
+
+namespace DoctorCrm.Tests;
+
+/// <summary>Business rules of the administration module, against a real API and database.</summary>
+public class AdminIntegrationTests(ApiFactory factory) : IClassFixture<ApiFactory>
+{
+    private async Task<HttpClient> AdminAsync()
+    {
+        var client = factory.CreateCookieClient();
+        var login = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(ApiFactory.AdminUsername, ApiFactory.AdminPassword));
+        login.EnsureSuccessStatusCode();
+        return client;
+    }
+
+    private static async Task<T> DataAsync<T>(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<T>>();
+        Assert.True(body!.Success, body.Message);
+        return body.Data!;
+    }
+
+    private static async Task<string?> MessageAsync(HttpResponseMessage response) =>
+        (await response.Content.ReadFromJsonAsync<ApiResponse<object>>())!.Message;
+
+    private async Task<int> RoleIdAsync(HttpClient admin, string name) =>
+        (await DataAsync<List<RoleDto>>(await admin.GetAsync("/api/roles"))).Single(r => r.Name == name).Id;
+
+    // ---- Lookup lists -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Treatment_lifecycle_create_rename_deactivate_reorder()
+    {
+        var admin = await AdminAsync();
+
+        var created = await DataAsync<LookupItemDto>(await admin.PostAsJsonAsync("/api/treatments",
+            new SaveLookupItemRequest("Chemical Peel", "Light peel", null)));
+        Assert.True(created.IsActive);
+
+        // Names are unique regardless of case.
+        var duplicate = await admin.PostAsJsonAsync("/api/treatments", new SaveLookupItemRequest("chemical peel", null, null));
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+
+        var renamed = await DataAsync<LookupItemDto>(await admin.PutAsJsonAsync($"/api/treatments/{created.Id}",
+            new SaveLookupItemRequest("Chemical Peel Pro", "Deeper peel", null)));
+        Assert.Equal("Chemical Peel Pro", renamed.Name);
+        Assert.Equal("Deeper peel", renamed.Description);
+
+        await DataAsync<LookupItemDto>(await admin.PatchAsJsonAsync($"/api/treatments/{created.Id}/active", new SetActiveRequest(false)));
+        var active = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/treatments"));
+        var all = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/treatments?includeInactive=true"));
+        Assert.DoesNotContain(active, t => t.Id == created.Id);
+        Assert.Contains(all, t => t.Id == created.Id && !t.IsActive);
+
+        var reversed = all.Select(t => t.Id).Reverse().ToList();
+        var reordered = await DataAsync<List<LookupItemDto>>(await admin.PutAsJsonAsync("/api/treatments/reorder", new ReorderRequest(reversed)));
+        Assert.Equal(reversed, reordered.Select(t => t.Id));
+
+        // A partial list means the client is out of date.
+        var partial = await admin.PutAsJsonAsync("/api/treatments/reorder", new ReorderRequest(reversed.Skip(1).ToList()));
+        Assert.Equal(HttpStatusCode.Conflict, partial.StatusCode);
+    }
+
+    [Fact]
+    public async Task Automation_stages_cannot_be_deactivated_but_custom_stages_can()
+    {
+        var admin = await AdminAsync();
+        var stages = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/stages?includeInactive=true"));
+
+        var booked = stages.Single(s => s.SystemKey == "booked");
+        var refused = await admin.PatchAsJsonAsync($"/api/stages/{booked.Id}/active", new SetActiveRequest(false));
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Contains("automation", await MessageAsync(refused));
+
+        // Renaming an automation stage is fine.
+        var renamed = await DataAsync<LookupItemDto>(await admin.PutAsJsonAsync($"/api/stages/{booked.Id}",
+            new SaveLookupItemRequest("Consultation Booked", null, "#0EA5E9")));
+        Assert.Equal("booked", renamed.SystemKey);
+
+        var vip = await DataAsync<LookupItemDto>(await admin.PostAsJsonAsync("/api/stages", new SaveLookupItemRequest("VIP", null, "#e11d48")));
+        Assert.Equal("#E11D48", vip.Color);
+        Assert.Null(vip.SystemKey);
+        var off = await DataAsync<LookupItemDto>(await admin.PatchAsJsonAsync($"/api/stages/{vip.Id}/active", new SetActiveRequest(false)));
+        Assert.False(off.IsActive);
+
+        var badColor = await admin.PostAsJsonAsync("/api/stages", new SaveLookupItemRequest("Bad", null, "red"));
+        Assert.Equal(HttpStatusCode.BadRequest, badColor.StatusCode);
+    }
+
+    [Fact]
+    public async Task Staff_can_read_lists_but_not_change_them_or_see_users()
+    {
+        var admin = await AdminAsync();
+        await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("Staff Member", "Staff_One", null, await RoleIdAsync(admin, "Staff"), "Staff-Pass-1")));
+
+        var staff = factory.CreateCookieClient();
+        (await staff.PostAsJsonAsync("/api/auth/login", new LoginRequest("Staff_One", "Staff-Pass-1"))).EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync("/api/lead-sources")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await staff.PostAsJsonAsync("/api/lead-sources", new SaveLookupItemRequest("TikTok", null, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync("/api/users")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync("/api/admin/settings")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Default_lists_are_seeded()
+    {
+        var admin = await AdminAsync();
+        Assert.Contains(await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/lead-sources")), x => x.Name == "Instagram");
+        Assert.Contains(await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/payment-methods")), x => x.Name == "Bank Transfer");
+        Assert.Contains(await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/cancellation-reasons")), x => x.Name == "Other");
+    }
+
+    // ---- Users --------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task User_create_update_reset_password_and_duplicate_username()
+    {
+        var admin = await AdminAsync();
+        var doctorRole = await RoleIdAsync(admin, "Doctor");
+
+        var user = await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("Dr Maria", "Dr_Maria", "Maria@Clinic.com", doctorRole, "Doctor-Pass-1")));
+        Assert.Equal("Doctor", user.RoleName);
+        Assert.Equal("maria@clinic.com", user.Email);
+
+        var taken = await admin.PostAsJsonAsync("/api/users", new CreateUserRequest("Other", "dr_maria", null, doctorRole, "Doctor-Pass-1"));
+        Assert.Equal(HttpStatusCode.Conflict, taken.StatusCode);
+
+        var weak = await admin.PostAsJsonAsync("/api/users", new CreateUserRequest("Weak", "Weak_User", null, doctorRole, "short"));
+        Assert.Equal(HttpStatusCode.BadRequest, weak.StatusCode);
+
+        var badName = await admin.PostAsJsonAsync("/api/users", new CreateUserRequest("Spaces", "has space", null, doctorRole, "Doctor-Pass-1"));
+        Assert.Equal(HttpStatusCode.BadRequest, badName.StatusCode);
+
+        var updated = await DataAsync<UserDto>(await admin.PutAsJsonAsync($"/api/users/{user.Id}",
+            new UpdateUserRequest("Dr Maria Lopez", "Dr_Maria", null, await RoleIdAsync(admin, "Receptionist"))));
+        Assert.Equal("Receptionist", updated.RoleName);
+        Assert.Null(updated.Email);
+
+        (await admin.PostAsJsonAsync($"/api/users/{user.Id}/reset-password", new ResetPasswordRequest("New-Pass-99"))).EnsureSuccessStatusCode();
+        var client = factory.CreateCookieClient();
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("Dr_Maria", "Doctor-Pass-1"))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,
+            (await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("Dr_Maria", "New-Pass-99"))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_cannot_lock_themselves_or_the_system_out()
+    {
+        var admin = await AdminAsync();
+        var me = (await DataAsync<SessionDto>(await admin.GetAsync("/api/auth/me"))).User;
+
+        var self = await admin.PatchAsJsonAsync($"/api/users/{me.Id}/active", new SetActiveRequest(false));
+        Assert.Equal(HttpStatusCode.BadRequest, self.StatusCode);
+        Assert.Contains("your own account", await MessageAsync(self));
+
+        // While Test_Admin is the only active admin, it can't be demoted.
+        var admins = (await DataAsync<List<UserDto>>(await admin.GetAsync("/api/users")))
+            .Count(u => u.RoleName == "Admin" && u.IsActive);
+        if (admins == 1)
+        {
+            var demote = await admin.PutAsJsonAsync($"/api/users/{me.Id}",
+                new UpdateUserRequest(me.FullName, me.Username, null, await RoleIdAsync(admin, "Staff")));
+            Assert.Equal(HttpStatusCode.BadRequest, demote.StatusCode);
+            Assert.Contains("last active administrator", await MessageAsync(demote));
+        }
+    }
+
+    // ---- Custom fields ------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Dropdown_custom_field_options_and_capture_row()
+    {
+        var admin = await AdminAsync();
+
+        var noOptions = await admin.PostAsJsonAsync("/api/custom-fields", new SaveCustomFieldRequest("Branch", "Dropdown", false, []));
+        Assert.Equal(HttpStatusCode.BadRequest, noOptions.StatusCode);
+
+        var field = await DataAsync<CustomFieldDto>(await admin.PostAsJsonAsync("/api/custom-fields",
+            new SaveCustomFieldRequest("Preferred Branch", "Dropdown", true,
+                [new SaveCustomFieldOption(null, "Dubai Marina"), new SaveCustomFieldOption(null, "Jumeirah")])));
+        Assert.Equal("preferred_branch", field.Key);
+        Assert.Equal(["Dubai Marina", "Jumeirah"], field.Options.Select(o => o.Label));
+
+        // It appears in the capture configuration, switched off.
+        var capture = await DataAsync<List<CaptureFieldDto>>(await admin.GetAsync("/api/admin/capture-fields"));
+        var row = capture.Single(c => c.Key == "preferred_branch");
+        Assert.True(row.IsCustom);
+        Assert.False(row.IsEnabled);
+
+        // Rename one option, drop the other, add a new one.
+        var marina = field.Options.Single(o => o.Label == "Dubai Marina");
+        var updated = await DataAsync<CustomFieldDto>(await admin.PutAsJsonAsync($"/api/custom-fields/{field.Id}",
+            new SaveCustomFieldRequest("Preferred Branch", "Dropdown", true,
+                [new SaveCustomFieldOption(marina.Id, "Marina"), new SaveCustomFieldOption(null, "Downtown")])));
+        Assert.Equal(["Marina", "Downtown"], updated.Options.Select(o => o.Label));
+        Assert.Equal(marina.Id, updated.Options[0].Id);
+
+        var typeChange = await admin.PutAsJsonAsync($"/api/custom-fields/{field.Id}",
+            new SaveCustomFieldRequest("Preferred Branch", "Text", false, null));
+        Assert.Equal(HttpStatusCode.BadRequest, typeChange.StatusCode);
+    }
+
+    // ---- Capture configuration ----------------------------------------------------------------
+
+    [Fact]
+    public async Task Capture_fields_keep_name_and_whatsapp_required_and_save_order()
+    {
+        var admin = await AdminAsync();
+        var fields = await DataAsync<List<CaptureFieldDto>>(await admin.GetAsync("/api/admin/capture-fields"));
+        Assert.All(fields.Where(f => f.Key is "name" or "whatsapp"), f => Assert.True(f.Locked && f.IsEnabled && f.IsRequired));
+
+        var hideName = fields.Select(f => new SaveCaptureField(f.Key, f.Key != "name" && f.IsEnabled, f.IsRequired)).ToList();
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await admin.PutAsJsonAsync("/api/admin/capture-fields", new SaveCaptureFieldsRequest(hideName))).StatusCode);
+
+        // Reverse the order, and ask for "notes" to be required while hidden: required is dropped.
+        var request = fields.AsEnumerable().Reverse()
+            .Select(f => f.Key == "notes" ? new SaveCaptureField("notes", false, true) : new SaveCaptureField(f.Key, f.IsEnabled, f.IsRequired))
+            .ToList();
+        var saved = await DataAsync<List<CaptureFieldDto>>(await admin.PutAsJsonAsync("/api/admin/capture-fields", new SaveCaptureFieldsRequest(request)));
+        Assert.Equal(request.Select(r => r.Key), saved.Select(s => s.Key));
+        Assert.False(saved.Single(s => s.Key == "notes").IsRequired);
+    }
+
+    // ---- Settings -----------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Settings_validate_and_update_branding()
+    {
+        var admin = await AdminAsync();
+        var current = await DataAsync<SystemSettingsDto>(await admin.GetAsync("/api/admin/settings"));
+        Assert.Equal("AED", current.Currency);
+
+        var bad = await admin.PutAsJsonAsync("/api/admin/settings", current with { TimeZone = "Mars/Olympus", Currency = "dirham" });
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+
+        // Three letters is not enough: it has to be a real currency (this once saved "DIR").
+        var fakeCurrency = await admin.PutAsJsonAsync("/api/admin/settings", current with { Currency = "DIR" });
+        Assert.Equal(HttpStatusCode.BadRequest, fakeCurrency.StatusCode);
+
+        await DataAsync<SystemSettingsDto>(await admin.PutAsJsonAsync("/api/admin/settings", current with { Tagline = "Test tagline" }));
+        var branding = await DataAsync<BrandingDto>(await factory.CreateClient().GetAsync("/api/settings/branding"));
+        Assert.Equal("Test tagline", branding.Tagline);
+
+        await DataAsync<SystemSettingsDto>(await admin.PutAsJsonAsync("/api/admin/settings", current));
+    }
+}

@@ -11,7 +11,8 @@ The CRM is built in **8 milestones**. Each one ends with both apps building, mig
 | Milestone | State |
 | --- | --- |
 | 1 — Foundation and login | **Done** (2026-09-30) |
-| 2 — Administration | Next |
+| 2 — Administration | **Done** (2026-09-30) |
+| 3 — Customers | Next |
 
 ### Environment as built
 
@@ -130,13 +131,15 @@ Frontend
 **Done when:** both apps build with no TS or C# errors and the full login → dashboard flow runs locally.
 
 ### Milestone 2 — Administration (§43, §44)
-- [ ] Shared admin table component: search, add/edit drawer, activate/deactivate, drag-to-reorder
-- [ ] Users: create, edit, assign role, reset password, last login
-- [ ] Treatments, Stages (with colour), Lead Sources, Cancellation Reasons, Payment Methods
-- [ ] Custom fields: 9 types (§32), options for dropdown/multi-select, required, enabled, order
-- [ ] Capture tool configuration: built-in + custom fields, enabled/required/order, drag-and-drop (§31)
-- [ ] System settings: branding (logo, name, tagline), currency, timezone
-- [ ] Stage colours served by the API, never hard-coded in components
+- [x] Shared admin table component: search, add/edit drawer, activate/deactivate, drag-to-reorder
+- [x] Users: create, edit, assign role, reset password, last login
+- [x] Treatments, Stages (with colour), Lead Sources, Cancellation Reasons, Payment Methods
+- [x] Custom fields: 9 types (§32), options for dropdown/multi-select, required, enabled, order
+- [x] Capture tool configuration: built-in + custom fields, enabled/required/order, drag-and-drop (§31)
+- [x] System settings: branding (logo, name, tagline), currency, timezone
+- [x] Stage colours served by the API, never hard-coded in components
+
+**Notes:** capture fields are previewed as the Chrome side panel beside WhatsApp Web. Currency must be a real ISO code (default AED).
 
 **Done when:** every admin list saves, reorders and deactivates; inactive items are hidden from new forms.
 

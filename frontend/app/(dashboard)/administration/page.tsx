@@ -1,63 +1,49 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  Ban,
-  ClipboardType,
-  Layers,
-  Megaphone,
-  Settings,
-  Smartphone,
-  Sparkles,
-  UserCog,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
+import { ADMIN_SECTIONS } from "@/components/admin/admin-sections";
 import { PageHeader } from "@/components/layout/page-header";
-import { RequirePermission } from "@/components/layout/require-permission";
 import { Card } from "@/components/ui/card";
-import { Permission } from "@/lib/permissions";
-
-const SECTIONS: { title: string; description: string; icon: LucideIcon }[] = [
-  { title: "Users", description: "Accounts, roles, activation and password resets", icon: UserCog },
-  { title: "Treatments", description: "The treatments customers can be interested in", icon: Sparkles },
-  { title: "Stages", description: "Customer stages, colours and order", icon: Layers },
-  { title: "Lead Sources", description: "Where customers come from", icon: Megaphone },
-  { title: "Custom Fields", description: "Extra customer fields of any type", icon: ClipboardType },
-  { title: "Capture Tool", description: "Fields shown in the WhatsApp capture tool", icon: Smartphone },
-  { title: "Cancellation Reasons", description: "Reasons offered when cancelling a booking", icon: Ban },
-  { title: "Payment Methods", description: "Cash, card, bank transfer and others", icon: Wallet },
-  { title: "System Settings", description: "Branding, currency and time zone", icon: Settings },
-];
+import { useBranding, useSession } from "@/lib/auth/session";
+import { can } from "@/lib/permissions";
 
 export default function AdministrationPage() {
+  const { data: session } = useSession();
+  const { data: branding } = useBranding();
+  const sections = ADMIN_SECTIONS.filter((s) => can(session?.user, s.permission));
+
   return (
-    <RequirePermission permission={Permission.AdminAccess}>
-      <PageHeader title="Administration" description="Configure how GrowDesk works for your clinic." />
+    <>
+      <PageHeader title="Administration" description={`Configure how ${branding?.crmName ?? "GrowDesk"} works for your clinic.`} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {SECTIONS.map(({ title, description, icon: Icon }, i) => (
+        {sections.map(({ href, title, description, icon: Icon }, i) => (
           <motion.div
-            key={title}
+            key={href}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: i * 0.04, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={{ y: -3 }}
           >
-            <Card className="flex h-full items-start gap-4 p-5">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
-                <Icon className="size-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="font-display text-[15px] font-semibold">{title}</h2>
-                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted">Soon</span>
+            <Link href={href} className="group block h-full rounded-2xl focus-visible:outline-offset-4">
+              <Card className="flex h-full items-start gap-4 p-5 transition-shadow duration-200 group-hover:shadow-[0_12px_32px_-12px_rgb(15_23_42/0.18)]">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand transition-colors duration-200 group-hover:bg-brand group-hover:text-white">
+                  <Icon className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="font-display text-[15px] font-semibold">{title}</h2>
+                    <ArrowRight className="size-4 -translate-x-1 text-muted opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
+                  </div>
+                  <p className="mt-1 text-sm text-muted">{description}</p>
                 </div>
-                <p className="mt-1 text-sm text-muted">{description}</p>
-              </div>
-            </Card>
+              </Card>
+            </Link>
           </motion.div>
         ))}
       </div>
-    </RequirePermission>
+    </>
   );
 }

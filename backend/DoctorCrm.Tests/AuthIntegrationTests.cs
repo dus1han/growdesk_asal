@@ -34,6 +34,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("AuthCookie:Secure", "false");
         builder.UseSetting("Seed:AdminUsername", AdminUsername);
         builder.UseSetting("Seed:AdminPassword", AdminPassword);
+        // Every test signs in; the production limit of 10 per minute would throttle the suite.
+        builder.UseSetting("RateLimiting:LoginPerMinute", "1000");
     }
 
     public HttpClient CreateCookieClient() =>

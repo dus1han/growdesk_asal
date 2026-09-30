@@ -14,6 +14,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Treatment> Treatments => Set<Treatment>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<LeadSource> LeadSources => Set<LeadSource>();
+    public DbSet<CancellationReason> CancellationReasons => Set<CancellationReason>();
+    public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
+    public DbSet<CustomField> CustomFields => Set<CustomField>();
+    public DbSet<CustomFieldOption> CustomFieldOptions => Set<CustomFieldOption>();
+    public DbSet<CaptureFieldConfiguration> CaptureFieldConfigurations => Set<CaptureFieldConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -72,6 +78,34 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.DisplayOrder);
         });
 
+        ConfigureSimpleLookup<LeadSource>(b);
+        ConfigureSimpleLookup<CancellationReason>(b);
+        ConfigureSimpleLookup<PaymentMethod>(b);
+
+        b.Entity<CustomField>(e =>
+        {
+            e.Property(x => x.Key).HasMaxLength(60).IsRequired();
+            e.HasIndex(x => x.Key).IsUnique();
+            e.Property(x => x.Label).HasMaxLength(100).IsRequired();
+            e.Property(x => x.FieldType).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.DisplayOrder);
+            e.Ignore(x => x.HasOptions);
+            e.HasMany(x => x.Options).WithOne(x => x.CustomField).HasForeignKey(x => x.CustomFieldId);
+        });
+
+        b.Entity<CustomFieldOption>(e =>
+        {
+            e.Property(x => x.Label).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => new { x.CustomFieldId, x.DisplayOrder });
+        });
+
+        b.Entity<CaptureFieldConfiguration>(e =>
+        {
+            e.Property(x => x.FieldKey).HasMaxLength(60).IsRequired();
+            e.HasIndex(x => x.FieldKey).IsUnique();
+            e.HasOne(x => x.CustomField).WithMany().HasForeignKey(x => x.CustomFieldId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         b.Entity<SystemSetting>(e =>
         {
             e.HasKey(x => x.Key);
@@ -90,6 +124,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => new { x.EntityType, x.EntityId });
         });
     }
+
+    private static void ConfigureSimpleLookup<T>(ModelBuilder b) where T : class, ILookupEntity =>
+        b.Entity<T>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.DisplayOrder);
+        });
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

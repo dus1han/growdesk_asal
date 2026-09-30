@@ -1,4 +1,5 @@
 using DoctorCrm.Api.DTOs;
+using DoctorCrm.Api.Services;
 
 namespace DoctorCrm.Api.Middleware;
 
@@ -18,6 +19,13 @@ public class ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddlewa
         {
             // The client went away (e.g. navigated before the response). Not an error.
             if (!context.Response.HasStarted) context.Response.StatusCode = 499;
+        }
+        catch (BusinessRuleException ex) when (!context.Response.HasStarted)
+        {
+            // Expected outcome of a rule check: the message is meant for the user.
+            context.Response.StatusCode = ex.StatusCode;
+            var errors = ex.Field is null ? null : new List<ApiError> { new(ex.Field, ex.Message) };
+            await context.Response.WriteAsJsonAsync(ApiResponse.Fail(ex.Message, errors));
         }
         catch (Exception ex)
         {

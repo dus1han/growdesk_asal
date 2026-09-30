@@ -1,6 +1,6 @@
 namespace DoctorCrm.Api.Entities;
 
-public class Treatment : AuditableEntity
+public class Treatment : AuditableEntity, ILookupEntity, IHasDescription
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
