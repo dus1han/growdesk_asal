@@ -5,7 +5,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { CAPTURE_EXTENSION } from "@/lib/capture-extension";
 
 /** How to get the GrowDesk Capture toolbar onto a PC: download it and load it into Chrome. */
-export function CaptureInstall({ showGuideLink = true }: { showGuideLink?: boolean }) {
+export function CaptureInstall({ showGuideLink = false }: { showGuideLink?: boolean }) {
   return (
     <Card className="overflow-hidden">
       <CardHeader
