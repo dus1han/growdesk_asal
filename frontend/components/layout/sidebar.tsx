@@ -1,17 +1,16 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { ChangePasswordDrawer } from "@/components/auth/change-password-drawer";
 import { LogoMark } from "@/components/ui/logo";
-import { useBranding, useLogout } from "@/lib/auth/session";
+import { useBranding } from "@/lib/auth/session";
 import { can } from "@/lib/permissions";
-import { cn, initials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { CurrentUser } from "@/types/api";
 import { mainNav, managementNav, type NavItem } from "./nav-items";
+import { UserMenu } from "./user-menu";
 
 const spring = { type: "spring", stiffness: 380, damping: 34 } as const;
 
@@ -26,8 +25,6 @@ interface SidebarProps {
 
 export function Sidebar({ user, collapsed, onToggle, variant = "desktop", onNavigate }: SidebarProps) {
   const { data: branding } = useBranding();
-  const logout = useLogout();
-  const [changingPassword, setChangingPassword] = useState(false);
   const isCollapsed = variant === "desktop" && collapsed;
   const main = mainNav.filter((i) => can(user, i.permission));
   const management = managementNav.filter((i) => can(user, i.permission));
@@ -107,39 +104,8 @@ export function Sidebar({ user, collapsed, onToggle, variant = "desktop", onNavi
 
       {/* User */}
       <div className="border-t border-line p-3">
-        <div className={cn("flex items-center gap-3 rounded-xl p-2", isCollapsed && "flex-col gap-2 p-1")}>
-          <div
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-accent text-xs font-bold text-white"
-            title={isCollapsed ? `${user.fullName} · ${user.roles.join(", ")}` : undefined}
-          >
-            {initials(user.fullName)}
-          </div>
-          {!isCollapsed && (
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">{user.fullName}</p>
-              <p className="truncate text-xs text-muted">{user.roles.join(", ")}</p>
-            </div>
-          )}
-          <button
-            onClick={() => setChangingPassword(true)}
-            aria-label="Change password"
-            title="Change password"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
-          >
-            <KeyRound className="size-4" />
-          </button>
-          <button
-            onClick={() => logout.mutate()}
-            disabled={logout.isPending}
-            aria-label="Sign out"
-            title="Sign out"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-danger"
-          >
-            <LogOut className="size-4" />
-          </button>
-        </div>
+        <UserMenu user={user} collapsed={isCollapsed} />
       </div>
-      <ChangePasswordDrawer open={changingPassword} onClose={() => setChangingPassword(false)} />
     </motion.aside>
   );
 }
