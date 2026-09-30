@@ -1,8 +1,32 @@
-# Doctor CRM — Development Plan
+# GrowDesk — Development Plan
 
 _As of 2026-09-30 · Source of truth: [Claude.md](Claude.md) (section numbers below are "§" references to it)_
 
 The CRM is built in **8 milestones**. Each one ends with both apps building, migrations applied, and the app running locally before the next one starts (§60, §67).
+
+---
+
+## Status
+
+| Milestone | State |
+| --- | --- |
+| 1 — Foundation and login | **Done** (2026-09-30) |
+| 2 — Administration | Next |
+
+### Environment as built
+
+| Item | Value |
+| --- | --- |
+| Product name | GrowDesk (code namespaces remain `DoctorCrm`) |
+| Repository | `git@github-personal:dus1han/growdesk_asal.git` (public) |
+| VPS stack | `/home/deploy/sites/growdesk_asal` (compose project `growdesk_asal`) |
+| Containers | `growdesk_asal-db`, `growdesk_asal-api`, `growdesk_asal-web` |
+| Database | PostgreSQL 18, database `growdesk_asal`, bound to `127.0.0.1:5440` on the VPS only |
+| App URL | `http://169.58.92.105:3110` (plain HTTP until a domain + Caddy TLS) |
+| Dev database access | SSH tunnel: `ssh -N -L 5440:127.0.0.1:5440 deploy@169.58.92.105` |
+| Dev admin login | `admin@growdesk.local` (password in `backend/DoctorCrm.Api/appsettings.Development.json`) |
+
+**Development uses the VPS database.** It must be cleared (drop and re-seed) before go-live.
 
 ---
 
@@ -87,21 +111,21 @@ BasicCRM/
 **Goal:** Login → animated transition → dashboard shell → authenticated API → PostgreSQL.
 
 Backend
-- [ ] Create solution and `DoctorCrm.Api` project; add EF Core + Npgsql
-- [ ] `ApiResponse<T>`, error middleware, Swagger, CORS, health check, Serilog
-- [ ] Entities: `users`, `roles`, `permissions`, `user_roles`, `stages` (with `system_key`), `treatments`, `system_settings`
-- [ ] First migration + seed (roles, admin user, default stages, sample treatments)
-- [ ] Auth: BCrypt hashing, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
-- [ ] HTTP-only cookie JWT, session expiry, inactive users blocked
-- [ ] Role/permission policies
+- [x] Create solution and `DoctorCrm.Api` project; add EF Core + Npgsql
+- [x] `ApiResponse<T>`, error middleware, Swagger, health check, Serilog (no CORS: the frontend proxies /api)
+- [x] Entities: `users`, `roles`, `permissions`, `user_roles`, `stages` (with `system_key`), `treatments`, `system_settings`
+- [x] First migration + seed (roles, admin user, default stages, sample treatments)
+- [x] Auth: BCrypt hashing, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
+- [x] HTTP-only cookie JWT, session expiry, inactive users blocked
+- [x] Role/permission policies
 
 Frontend
-- [ ] Create Next.js app; Tailwind + shadcn/ui; theme tokens (light/dark)
-- [ ] Central API client (sends cookie, handles 401 → login)
-- [ ] Auth context + route-protection middleware; `lib/permissions` map
-- [ ] **Premium login (§7, §65):** moving gradient, floating orbs/particles, logo scale-in, card and fields staggered in, button → progress animation → dashboard transition, reduced-motion support
-- [ ] Layout: collapsible sidebar (remembers state, tooltips when collapsed), mobile drawer/bottom nav, page transitions
-- [ ] Dashboard and admin shells; unauthorized page
+- [x] Create Next.js app; Tailwind + shadcn/ui; theme tokens (light/dark)
+- [x] Central API client (sends cookie, handles 401 → login)
+- [x] Auth context + route-protection middleware; `lib/permissions` map
+- [x] **Premium login (§7, §65):** moving gradient, floating orbs/particles, logo scale-in, card and fields staggered in, button → progress animation → dashboard transition, reduced-motion support
+- [x] Layout: collapsible sidebar (remembers state, tooltips when collapsed), mobile drawer/bottom nav, page transitions
+- [x] Dashboard and admin shells; unauthorized page
 
 **Done when:** both apps build with no TS or C# errors and the full login → dashboard flow runs locally.
 
@@ -206,31 +230,19 @@ Frontend
 
 ---
 
-## 6. Getting started
+## 6. Getting started (daily development)
 
-1. **Confirm the six decisions** in section 2.
-2. **Add PostgreSQL to PATH** (or use Docker):
-   ```powershell
-   $env:Path += ";C:\Program Files\PostgreSQL\18\bin"
-   psql -U postgres -c "CREATE DATABASE doctor_crm;"
+1. Open the database tunnel (leave it running):
+   ```bash
+   ssh -N -L 5440:127.0.0.1:5440 deploy@169.58.92.105
    ```
-   Docker alternative:
-   ```powershell
-   docker run -d --name doctor-crm-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=doctor_crm -p 5432:5432 postgres:18
+2. Backend — `backend/DoctorCrm.Api/appsettings.Development.json` holds the connection string, JWT key and seed admin (gitignored; copy `appsettings.Development.example.json` on a new machine):
+   ```bash
+   cd backend/DoctorCrm.Api && dotnet run        # http://localhost:5080, Swagger at /swagger
    ```
-3. **Initialise git** so every milestone is a commit: `git init`.
-4. **Create environment files** (never commit real values):
-   - `frontend/.env.local` → `NEXT_PUBLIC_API_URL=http://localhost:5000`
-   - `backend/DoctorCrm.Api/appsettings.Development.json` (or user-secrets) →
-     `ConnectionStrings__DefaultConnection`, `Jwt__Key`, `Jwt__Issuer`, `Jwt__Audience`, `CaptureApi__ClientId`, `CaptureApi__ClientSecret`
-   - Commit only `.env.example` / `appsettings.Development.example.json`.
-5. **Install the EF tool:** `dotnet tool install --global dotnet-ef`.
-6. **Start Milestone 1** — ask Claude: _"Start Milestone 1 from DEVELOPMENT_PLAN.md."_
-
-### Daily run commands (after Milestone 1)
-```powershell
-# backend
-cd backend/DoctorCrm.Api; dotnet run
-# frontend
-cd frontend; npm run dev
-```
+3. Frontend:
+   ```bash
+   cd frontend && npm install && npm run dev      # http://localhost:3000
+   ```
+4. Tests: `cd backend && dotnet test DoctorCrm.slnx` (needs Docker for the PostgreSQL test container).
+5. Deploy: push to `main`. GitHub Actions tests, builds both images to GHCR and deploys to the VPS.
