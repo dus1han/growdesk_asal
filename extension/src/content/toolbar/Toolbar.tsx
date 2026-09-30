@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { displayValue, enabledFields, fieldKind, hasValue, saveBlocker, type CaptureSession, type FieldValue, type Platform } from '../../types/capture';
 import type { ConfigBundle, ConfigField } from '../../types/growdesk';
-import { CaretIcon, CheckIcon, CloseIcon, DrawIcon, HelpIcon, LogoMark, PlayIcon, SendIcon } from './icons';
+import { CaretIcon, CheckIcon, CloseIcon, HelpIcon, LogoMark, PlayIcon, SendIcon } from './icons';
 import { Picker } from './Picker';
 
 export interface StatusMessage {
@@ -24,8 +24,8 @@ export interface ToolbarProps {
   onSetValue: (key: string, value: FieldValue | null) => void;
   onOpenSettings: () => void;
   onOpenGuide: () => void;
-  /** Draw a box around text on the page: for a field (from its chip), or choose after (null). */
-  onDraw: (key: string | null) => void;
+  /** Draw a box around text on the page to capture it into a field (from the field's chip). */
+  onDraw: (key: string) => void;
 }
 
 /**
@@ -98,12 +98,6 @@ export function Toolbar(props: ToolbarProps) {
           )}
         </span>
 
-        {active && (
-          <button type="button" className="gd-draw-bar-btn" onClick={() => props.onDraw(null)} disabled={busy} title="Draw a box around text on the page to capture it">
-            <DrawIcon />
-            Draw
-          </button>
-        )}
         <button type="button" className="gd-icon-btn gd-icon-btn--help" onClick={props.onOpenGuide} title="How to use GrowDesk Capture" aria-label="How to use GrowDesk Capture">
           <HelpIcon />
         </button>

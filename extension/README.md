@@ -29,9 +29,9 @@ Revoking the connection in GrowDesk stops this PC on its next request.
 1. Open `https://web.whatsapp.com/` or `https://www.instagram.com/` and press **START**.
 2. Highlight a name or number, right-click, then **GrowDesk Capture → Set as Name / Set as WhatsApp
    Number / …** (Notes collect several: **Add to Notes**.)
-   Text that can't be highlighted, such as the name and number in WhatsApp's Contact info: press
-   **Draw** on the bar and drag a box around it, then choose **Set as …**. Or click the field's chip
-   and choose **Draw a box around it**. Only the words inside the box are taken.
+   Text that can't be highlighted, such as the name and number in WhatsApp's Contact info: click
+   the field's chip (e.g. **Name**), choose **Draw a box around it**, and drag a box around the
+   text. Only the words inside the box are taken.
 3. Click a list chip (e.g. **Interested Treatments ▾**) to choose from GrowDesk's lists. Click
    a captured chip to see or remove its value.
 4. Press **STOP**. STOP is available once every required field (red `*`) is filled and there's

@@ -48,7 +48,7 @@ export function MockToolbar({
   busy,
   picker,
   pressed,
-  showDraw = true,
+  textPopover,
 }: {
   capturing: boolean;
   chips: MockChip[];
@@ -59,8 +59,8 @@ export function MockToolbar({
   picker?: MockPicker | null;
   /** data-target of a control shown pressed (the guide's click). */
   pressed?: string | null;
-  /** The "Draw" button (draw a box around text that can't be highlighted). */
-  showDraw?: boolean;
+  /** A text field's pop-up, open under its chip (offers "Draw a box around it"). */
+  textPopover?: { chipKey: string; title: string } | null;
 }) {
   const press = (t: string) => (pressed === t ? "scale-[0.96]" : "");
   return (
@@ -152,6 +152,33 @@ export function MockToolbar({
               </motion.span>
 
               <AnimatePresence>
+                {textPopover?.chipKey === c.key && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.16 }}
+                    className="absolute left-0 top-[calc(100%+8px)] z-30 w-64 overflow-hidden rounded-[14px] border border-line bg-white shadow-pop"
+                  >
+                    <p className="px-3.5 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-[0.06em] text-muted">{textPopover.title}</p>
+                    <div className="px-3.5 pb-3">
+                      <span
+                        data-target="pop-draw"
+                        className={cn(
+                          "flex h-[34px] items-center justify-center gap-2 rounded-[9px] bg-brand text-[12.5px] font-semibold text-white transition-transform duration-150",
+                          press("pop-draw"),
+                        )}
+                      >
+                        <Scan className="size-[15px]" /> Draw a box around it
+                      </span>
+                      <p className="mt-2 text-[11.5px] leading-snug text-muted">
+                        For text that can&apos;t be highlighted, like the name in Contact info.
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <AnimatePresence>
                 {picker?.chipKey === c.key && (
                   <motion.div
                     initial={{ opacity: 0, y: -4, scale: 0.97 }}
@@ -208,17 +235,6 @@ export function MockToolbar({
         </AnimatePresence>
       </span>
 
-      {capturing && showDraw && (
-        <span
-          data-target="draw"
-          className={cn(
-            "inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-[9px] border border-dashed border-brand/55 px-2.5 text-[12.5px] font-semibold text-brand-strong transition-transform duration-150",
-            press("draw"),
-          )}
-        >
-          <Scan className="size-[15px]" /> Draw
-        </span>
-      )}
       <span data-target="help" className={cn("flex size-[30px] shrink-0 items-center justify-center rounded-lg text-muted", press("help"))}>
         <CircleHelp className="size-4" />
       </span>

@@ -45,8 +45,8 @@ function App({ platform }: { platform: Platform }) {
   const [errorField, setErrorField] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<SavedLead | null>(null);
-  /** "Draw a box" in progress: for a field chosen from its chip, or choose after (null). */
-  const [drawing, setDrawing] = useState<{ key: string | null } | null>(null);
+  /** "Draw a box around it" in progress, for the field whose chip it was chosen from. */
+  const [drawing, setDrawing] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
 
   /** Confirmations fade; errors and warnings stay until the next action, so they can't be missed. */
@@ -172,7 +172,7 @@ function App({ platform }: { platform: Platform }) {
     [apply, errorField, show],
   );
 
-  const textFields = enabledFields(bundle).filter((f) => fieldKind(f) === 'highlight');
+  const drawingField = drawing ? (enabledFields(bundle).find((f) => f.key === drawing && fieldKind(f) === 'highlight') ?? null) : null;
 
   const captureDrawn = async (field: ConfigField, text: string) => {
     setDrawing(null);
@@ -190,11 +190,10 @@ function App({ platform }: { platform: Platform }) {
 
   return (
     <>
-      {drawing && (
+      {drawingField && (
         <div className="gd">
           <BoxPicker
-            field={drawing.key ? (textFields.find((f) => f.key === drawing.key) ?? null) : null}
-            fields={textFields}
+            field={drawingField}
             skip={document.getElementById(HOST_ID)}
             onCapture={(f, t) => void captureDrawn(f, t)}
             onCancel={(message) => {
@@ -218,7 +217,7 @@ function App({ platform }: { platform: Platform }) {
         onSetValue={(k, v) => void handleSetValue(k, v)}
         onOpenSettings={() => void send({ type: 'GD_OPEN_SETTINGS' })}
         onOpenGuide={() => void send({ type: 'GD_OPEN_GUIDE' })}
-        onDraw={(key) => setDrawing({ key })}
+        onDraw={(key) => setDrawing(key)}
       />
       {saved && (
         <div className="gd">
