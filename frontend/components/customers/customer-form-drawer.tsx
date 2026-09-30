@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch, type Control } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -67,7 +67,7 @@ export function CustomerFormDrawer({ open, onClose, customer, onSaved }: Custome
       open={open}
       onOpenChange={(o) => !o && onClose()}
       title={customer ? "Edit customer" : "Add customer"}
-      description={customer ? undefined : "A WhatsApp number or Instagram name is enough to get started."}
+      description={customer ? undefined : "A WhatsApp number is enough to get started. Instagram is under More details."}
       footer={
         <>
           <Button type="button" variant="secondary" onClick={onClose}>
@@ -100,7 +100,8 @@ function CustomerForm({
   const fields = useActiveCustomFields();
   const save = useSaveCustomer();
   const [duplicate, setDuplicate] = useState<DuplicateCustomer | null>(null);
-  const [showMore, setShowMore] = useState(false);
+  // Instagram lives under More details: open it when editing an Instagram-only customer.
+  const [showMore, setShowMore] = useState(!!customer?.instagram && !customer?.whatsApp);
 
   const {
     register,
@@ -129,6 +130,11 @@ function CustomerForm({
   });
 
   const stageId = useWatch({ control, name: "stageId" });
+  const instagramError = errors.instagram?.message;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reveal the field that needs fixing
+    if (instagramError) setShowMore(true);
+  }, [instagramError]);
   const treatmentIds = useWatch({ control, name: "treatmentIds" });
 
   const requiredFields = fields.data?.filter((f) => f.isRequired) ?? [];
@@ -227,8 +233,20 @@ function CustomerForm({
           <Field label="WhatsApp" hint="Any country, with its code (e.g. +94…). UAE numbers work without it." error={errors.whatsApp?.message}>
             {(p) => <Input {...p} type="tel" inputMode="tel" placeholder="+971 50 123 4567" autoComplete="off" {...register("whatsApp")} />}
           </Field>
-          <Field label="Instagram" error={errors.instagram?.message}>
-            {(p) => <Input {...p} placeholder="@username" autoCapitalize="none" spellCheck={false} autoComplete="off" {...register("instagram")} />}
+          <Field label="Lead source" optional error={errors.leadSourceId?.message}>
+            {(p) => (
+              <Select {...p} {...register("leadSourceId", { setValueAs: idOrNull })}>
+                <option value="">Not set</option>
+                {sources.data?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+                {customer?.leadSource && !sources.data?.some((s) => s.id === customer.leadSource!.id) && (
+                  <option value={customer.leadSource.id}>{customer.leadSource.name}</option>
+                )}
+              </Select>
+            )}
           </Field>
         </div>
       </section>
@@ -348,20 +366,8 @@ function CustomerForm({
                   <Field label="Email" optional error={errors.email?.message}>
                     {(p) => <Input {...p} type="email" autoComplete="off" {...register("email")} />}
                   </Field>
-                  <Field label="Lead source" optional error={errors.leadSourceId?.message}>
-                    {(p) => (
-                      <Select {...p} {...register("leadSourceId", { setValueAs: idOrNull })}>
-                        <option value="">Not set</option>
-                        {sources.data?.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                        {customer?.leadSource && !sources.data?.some((s) => s.id === customer.leadSource!.id) && (
-                          <option value={customer.leadSource.id}>{customer.leadSource.name}</option>
-                        )}
-                      </Select>
-                    )}
+                  <Field label="Instagram" optional error={errors.instagram?.message}>
+                    {(p) => <Input {...p} placeholder="@username" autoCapitalize="none" spellCheck={false} autoComplete="off" {...register("instagram")} />}
                   </Field>
                   <Field label="Assigned to" optional error={errors.assignedUserId?.message}>
                     {(p) => (
