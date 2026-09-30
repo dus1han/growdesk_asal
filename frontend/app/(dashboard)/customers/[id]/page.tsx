@@ -10,6 +10,7 @@ import {
   ChevronDown,
   CircleAlert,
   Mail,
+  Megaphone,
   MessageCircle,
   Pencil,
   Phone,
@@ -124,7 +125,22 @@ function Profile({ id }: { id: number }) {
                 <FollowUpValue date={customer.nextFollowUpDate} />
               </Detail>
               <Detail label="Last contact">{customer.lastContactDate ? formatDate(customer.lastContactDate) : <Empty />}</Detail>
-              <Detail label="Lead source">{customer.leadSource?.name ?? <Empty />}</Detail>
+              <Detail label="Instagram">
+                {customer.instagram ? (
+                  <a
+                    href={`https://instagram.com/${customer.instagram}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open on Instagram"
+                    className="inline-flex items-center gap-1 text-brand-strong underline-offset-2 hover:underline"
+                  >
+                    <AtSign className="size-3.5" />
+                    {customer.instagram}
+                  </a>
+                ) : (
+                  <Empty />
+                )}
+              </Detail>
               <Detail label="Assigned to">{customer.assignedUser?.name ?? <Empty />}</Detail>
               <Detail label="Added">
                 <span title={formatDateTime(customer.createdAt)}>{formatDate(customer.createdAt.slice(0, 10))}</span>
@@ -219,8 +235,15 @@ function ProfileHeader({
         {customer.whatsApp && (
           <ContactPill icon={MessageCircle} label={customer.whatsApp} href={whatsAppUrl(customer.whatsApp)} title="Open in WhatsApp" />
         )}
-        {customer.instagram && (
-          <ContactPill icon={AtSign} label={customer.instagram} href={`https://instagram.com/${customer.instagram}`} title="Open on Instagram" />
+        {customer.leadSource && (
+          <span
+            className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface-muted/60 px-3 py-2 text-sm"
+            title="Lead source: where this customer came from"
+          >
+            <Megaphone className="size-4 text-muted" />
+            <span className="text-muted">Source</span>
+            <span className="font-medium">{customer.leadSource.name}</span>
+          </span>
         )}
         {customer.secondaryPhone && <ContactPill icon={Phone} label={customer.secondaryPhone} href={`tel:${customer.secondaryPhone.replace(/\s/g, "")}`} />}
         {customer.email && <ContactPill icon={Mail} label={customer.email} href={`mailto:${customer.email}`} />}

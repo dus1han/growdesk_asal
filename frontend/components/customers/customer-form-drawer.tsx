@@ -43,6 +43,12 @@ const schema = z
   });
 type FormValues = z.infer<typeof schema>;
 
+/** Adding a customer also needs an interested treatment (backend CustomerService.CreateAsync). */
+const newCustomerSchema = schema.refine((v) => v.treatmentIds.length > 0, {
+  path: ["treatmentIds"],
+  message: "Choose at least one interested treatment.",
+});
+
 /** Turns "" from a <select> into null and anything else into a number. */
 const idOrNull = (v: unknown) => (v === "" || v === null || v === undefined ? null : Number(v));
 
@@ -104,7 +110,7 @@ function CustomerForm({
     setValue,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(customer ? schema : newCustomerSchema),
     defaultValues: {
       name: customer?.name ?? "",
       whatsApp: customer?.whatsApp ?? "",
@@ -256,7 +262,9 @@ function CustomerForm({
       </fieldset>
 
       <fieldset>
-        <legend className="mb-2 text-[13px] font-medium">Interested treatments</legend>
+        <legend className="mb-2 text-[13px] font-medium">
+          Interested treatments{!customer && <span className="ml-0.5 text-danger" aria-hidden>*</span>}
+        </legend>
         {errors.treatmentIds?.message && <p className="-mt-1 mb-2 text-xs text-danger">{errors.treatmentIds.message}</p>}
         <div className="flex flex-wrap gap-2">
           {treatments.data?.map((t) => {
@@ -267,7 +275,7 @@ function CustomerForm({
                 type="button"
                 aria-pressed={selected}
                 onClick={() =>
-                  setValue("treatmentIds", selected ? treatmentIds.filter((id) => id !== t.id) : [...treatmentIds, t.id], { shouldDirty: true })
+                  setValue("treatmentIds", selected ? treatmentIds.filter((id) => id !== t.id) : [...treatmentIds, t.id], { shouldDirty: true, shouldValidate: !!errors.treatmentIds })
                 }
                 className={cn(
                   "rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",

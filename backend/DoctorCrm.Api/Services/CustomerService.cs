@@ -119,6 +119,11 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
 
     public async Task<CustomerDetailDto> CreateAsync(SaveCustomerRequest request, int? userId, CancellationToken ct)
     {
+        // A new customer is added for a treatment they're interested in. Only on creation: older
+        // customers (e.g. captured without one) can still be edited and moved between stages.
+        if (request.TreatmentIds is not { Count: > 0 })
+            throw new BusinessRuleException("Choose at least one interested treatment.", field: "treatmentIds");
+
         var customer = new Customer();
         await ApplyAsync(customer, request, isNew: true, ct);
         db.Customers.Add(customer);

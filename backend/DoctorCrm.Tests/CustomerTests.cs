@@ -62,7 +62,26 @@ public class CustomerIntegrationTests(ApiFactory factory) : IClassFixture<ApiFac
 
     private static SaveCustomerRequest Customer(string name, string? whatsApp = null, string? instagram = null,
         IReadOnlyList<int>? treatments = null, int? stageId = null, Dictionary<string, JsonElement>? customFields = null) =>
-        new(name, whatsApp, null, instagram, null, stageId, null, null, treatments, null, null, null, customFields);
+        // Seeded treatment 1 by default: a new customer needs an interested treatment.
+        new(name, whatsApp, null, instagram, null, stageId, null, null, treatments ?? [1], null, null, null, customFields);
+
+    [Fact]
+    public async Task A_new_customer_needs_a_treatment_but_an_existing_one_can_be_saved_without()
+    {
+        var admin = await AdminAsync();
+        var none = await admin.PostAsJsonAsync("/api/customers",
+            new SaveCustomerRequest("No Treatment", NewNumber(), null, null, null, null, null, null, [], null, null, null, null));
+        Assert.Equal(HttpStatusCode.BadRequest, none.StatusCode);
+        var body = await none.Content.ReadFromJsonAsync<ApiResponse<object>>();
+        Assert.Equal("Choose at least one interested treatment.", body!.Message);
+        Assert.Equal("treatmentIds", body.Errors![0].Field);
+
+        // Editing later may clear the interests (e.g. a customer captured without any).
+        var created = await DataAsync<CustomerDetailDto>(await admin.PostAsJsonAsync("/api/customers", Customer("Has Treatment", NewNumber())));
+        var cleared = await DataAsync<CustomerDetailDto>(await admin.PutAsJsonAsync($"/api/customers/{created.Id}",
+            new SaveCustomerRequest("Has Treatment", created.WhatsApp, null, null, null, null, null, null, [], null, null, null, null)));
+        Assert.Empty(cleared.Treatments);
+    }
 
     [Fact]
     public async Task New_customer_starts_as_interested_with_a_normalised_number()
