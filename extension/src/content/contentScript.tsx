@@ -94,6 +94,7 @@ function App({ platform }: { platform: Platform }) {
       if (!isStatePush(message)) return;
       setSession(message.session);
       if (message.bundle) setBundle(message.bundle);
+      if (message.configured !== undefined) setConfigured(message.configured);
       if (message.flash) show(message.flash, message.flashTone ?? 'success');
     };
     chrome.runtime.onMessage.addListener(listener);
@@ -105,6 +106,10 @@ function App({ platform }: { platform: Platform }) {
   }, []);
 
   const handleStart = useCallback(async () => {
+    if (!configured) {
+      show('Connect GrowDesk Capture first: click Connect.', 'error');
+      return;
+    }
     setBusy(true);
     setErrorField(null);
     show('Connecting to GrowDesk…', 'pending');
@@ -116,7 +121,7 @@ function App({ platform }: { platform: Platform }) {
       return;
     }
     show('Capturing: highlight text, right-click, then choose GrowDesk Capture.', 'success');
-  }, [platform, apply, show]);
+  }, [platform, apply, show, configured]);
 
   const handleStop = useCallback(async () => {
     const blocker = saveBlocker(session, bundle);

@@ -117,7 +117,14 @@ export function Toolbar(props: ToolbarProps) {
             STOP
           </button>
         ) : (
-          <button type="button" className="gd-btn" onClick={props.onStart} disabled={busy} title="Start capturing a lead">
+          // START needs a GrowDesk connection; until then it stays disabled next to the Connect link.
+          <button
+            type="button"
+            className="gd-btn"
+            onClick={props.onStart}
+            disabled={busy || !configured}
+            title={configured ? 'Start capturing a lead' : 'Connect GrowDesk Capture first (click the GrowDesk logo or Connect)'}
+          >
             {busy ? <span className="gd-spinner" aria-hidden="true" /> : <PlayIcon />}
             START
           </button>

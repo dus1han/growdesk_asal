@@ -15,6 +15,7 @@ import { Badge, Field, Input } from "@/components/ui/form-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toastError, useCaptureClientMutations, useCaptureClients } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
+import { copyText } from "@/lib/clipboard";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CaptureClient, CaptureClientCreated } from "@/types/admin";
@@ -214,12 +215,11 @@ function CreatedDetails({ created }: { created: CaptureClientCreated }) {
 
 function CopyField({ label, value, mono, secret }: { label: string; value: string; mono?: boolean; secret?: boolean }) {
   const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
+  const copy = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (await copyText(value, e.currentTarget)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
-    } catch {
+    } else {
       toast.error("Couldn't copy. Select the text and copy it instead.");
     }
   };

@@ -9,10 +9,18 @@ import { mergeHighlight, normalizeSelection } from '../utils/normalize';
 import { platformFromUrl } from '../utils/platform';
 
 const BUNDLE_KEY = 'growdesk-capture-config';
+const SETTINGS_KEY = 'growdesk-capture-settings';
 
 /** Pushes state (and an optional flash message) down to one tab's toolbar. */
 async function pushState(tabId: number, session: CaptureSession | null, flash?: string, flashTone: StatePushMessage['flashTone'] = 'success'): Promise<void> {
-  const message: StatePushMessage = { type: 'GD_STATE', session, bundle: await cachedBundle(), flash, flashTone };
+  const message: StatePushMessage = {
+    type: 'GD_STATE',
+    session,
+    bundle: await cachedBundle(),
+    configured: isConfigured(await readSettings()),
+    flash,
+    flashTone,
+  };
   try {
     await chrome.tabs.sendMessage(tabId, message);
   } catch {
@@ -49,11 +57,22 @@ chrome.windows.onFocusChanged.addListener(() => void syncMenusForActiveTab());
 chrome.tabs.onRemoved.addListener((tabId) => void clearSession(tabId));
 
 // A new field setup (fetched on START or by the settings page) changes the right-click menu.
+// Connecting in the settings, or a new field setup, is pushed to every open WhatsApp and
+// Instagram tab at once, so a tab opened earlier doesn't keep saying "Not connected".
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && BUNDLE_KEY in changes) {
+  if (area !== 'local') return;
+  if (BUNDLE_KEY in changes) {
     void rebuildMenus((changes[BUNDLE_KEY].newValue as ConfigBundle | undefined) ?? null).then(syncMenusForActiveTab);
   }
+  if (BUNDLE_KEY in changes || SETTINGS_KEY in changes) void pushToCaptureTabs();
 });
+
+async function pushToCaptureTabs(): Promise<void> {
+  const tabs = await chrome.tabs.query({ url: ['https://web.whatsapp.com/*', 'https://www.instagram.com/*'] }).catch(() => []);
+  for (const tab of tabs) {
+    if (tab.id != null) await pushState(tab.id, await readSession(tab.id));
+  }
+}
 
 // The toolbar icon has no popup: a click opens the settings.
 chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());

@@ -45,6 +45,8 @@ export interface StatePushMessage {
   type: 'GD_STATE';
   session: CaptureSession | null;
   bundle: ConfigBundle | null;
+  /** Whether a GrowDesk connection is saved in the settings. */
+  configured?: boolean;
   /** Optional transient toolbar message, e.g. "Name captured: John Fernando". */
   flash?: string;
   flashTone?: 'success' | 'error';
