@@ -52,7 +52,9 @@ export const CREATED_PRESETS: Record<string, DatePreset> = {
 
 /** "Follow-up" filter presets. */
 export const FOLLOW_UP_PRESETS: Record<string, DatePreset> = {
+  due: { label: "Due now (incl. overdue)", range: () => ({ to: today() }) },
   overdue: { label: "Overdue", range: () => ({ to: isoDate(addDays(new Date(), -1)) }) },
   today: { label: "Due today", range: () => ({ from: today(), to: today() }) },
   week: { label: "Next 7 days", range: () => ({ from: today(), to: isoDate(addDays(new Date(), 6)) }) },
+  soon: { label: "Within 7 days (incl. overdue)", range: () => ({ to: isoDate(addDays(new Date(), 6)) }) },
 };

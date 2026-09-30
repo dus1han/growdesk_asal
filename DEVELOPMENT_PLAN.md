@@ -16,7 +16,8 @@ The CRM is built in **8 milestones**. Each one ends with both apps building, mig
 | 4 — Bookings and calendar | **Done** (2026-09-30) |
 | 5 — Payments | **Done** (2026-09-30) |
 | Change password (added) | **Done** (2026-09-30) |
-| 6 — Dashboard | Next |
+| 6 — Dashboard | **Done** (2026-09-30) |
+| 7 — Capture API | Next |
 
 ### Environment as built
 
@@ -193,13 +194,15 @@ Frontend
 - [x] Users list shows a "Temporary password" badge
 
 ### Milestone 6 — Dashboard (§10, §11, §29)
-- [ ] `GET /api/dashboard` — real data only
-- [ ] Top cards: Today's Consultations, Upcoming, Follow-ups, Potential Customers (animated counters, change vs yesterday)
-- [ ] Today's appointments (click → booking details)
-- [ ] Stage summary (click → filtered customer list)
-- [ ] Follow-ups due
-- [ ] Recent activity from the audit log (timeline animation)
-- [ ] Skeleton loaders for every section
+- [x] `GET /api/dashboard` — real data only, clinic time zone; sections the user can't see are left out
+- [x] Top cards: Today's Consultations, Upcoming, Follow-ups, Potential Customers (animated counters, change vs yesterday); each links to its list
+- [x] Today's appointments (click → booking details)
+- [x] Stage summary (click → filtered customer list)
+- [x] Follow-ups: overdue, today and the next 7 days
+- [x] Recent activity from the audit log (timeline animation), without automatic stage moves or duplicate payment entries
+- [x] Skeleton loaders for every section; refreshes every minute and after any change
+
+**Notes:** cancelled and rescheduled bookings are not counted as consultations. "Potential" means the Interested and Follow-up stages.
 
 ### Milestone 7 — Capture API (§30–§36)
 - [ ] Client-credential token endpoint; rate limiting; audit logging

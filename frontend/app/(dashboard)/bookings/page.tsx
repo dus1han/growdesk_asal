@@ -7,7 +7,7 @@ import { Suspense, useEffect, useState } from "react";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
 import { BookingDetailsDrawer } from "@/components/bookings/booking-details-drawer";
 import { BookingFormDrawer, type BookingPrefill } from "@/components/bookings/booking-form-drawer";
-import { BookingList } from "@/components/bookings/booking-list";
+import { BookingList, type Tab } from "@/components/bookings/booking-list";
 import { PageHeader } from "@/components/layout/page-header";
 import { RequirePermission } from "@/components/layout/require-permission";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,8 @@ function Bookings() {
   const [booking, setBooking] = useState<BookingPrefill | null>(null);
 
   const fromUrl = params.get("view");
+  const tabParam = params.get("tab");
+  const initialTab: Tab | undefined = tabParam === "today" || tabParam === "history" || tabParam === "upcoming" ? tabParam : undefined;
   const view: View = fromUrl === "list" || fromUrl === "calendar" ? fromUrl : "calendar";
 
   // No view in the address: reopen whichever view was used last.
@@ -106,7 +108,7 @@ function Bookings() {
         {view === "calendar" ? (
           <BookingCalendar onOpenBooking={setOpenId} onPickSlot={canBook ? (slot) => setBooking(slot) : undefined} />
         ) : (
-          <BookingList onOpen={setOpenId} onBook={canBook ? () => setBooking({}) : undefined} />
+          <BookingList initialTab={initialTab} onOpen={setOpenId} onBook={canBook ? () => setBooking({}) : undefined} />
         )}
       </Card>
 

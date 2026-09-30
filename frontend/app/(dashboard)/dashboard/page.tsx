@@ -1,29 +1,36 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Bell, CalendarClock, CalendarDays, ListChecks, Sparkles, UserRoundSearch } from "lucide-react";
+import { CircleAlert, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { BookingDetailsDrawer } from "@/components/bookings/booking-details-drawer";
+import { BookingFormDrawer } from "@/components/bookings/booking-form-drawer";
+import { FollowUps, RecentActivity, StageSummary, TodaysAppointments } from "@/components/dashboard/dashboard-sections";
+import { StatCards } from "@/components/dashboard/stat-cards";
 import { PageHeader } from "@/components/layout/page-header";
 import { RequirePermission } from "@/components/layout/require-permission";
-import { Card, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useDashboard } from "@/lib/api/dashboard";
 import { useSession } from "@/lib/auth/session";
-import { Permission } from "@/lib/permissions";
-
-const STAT_CARDS = [
-  { label: "Today's Consultations", icon: CalendarDays, tint: "from-brand/15 to-brand/0 text-brand" },
-  { label: "Upcoming", icon: CalendarClock, tint: "from-sky-500/15 to-sky-500/0 text-sky-600" },
-  { label: "Follow-ups", icon: Bell, tint: "from-amber-500/15 to-amber-500/0 text-amber-600" },
-  { label: "Potential Customers", icon: UserRoundSearch, tint: "from-accent/15 to-accent/0 text-teal-600" },
-];
+import { can, Permission } from "@/lib/permissions";
 
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
+/** "What needs my attention today?" (spec §10). Every number comes from the API. */
 export default function DashboardPage() {
   const { data: session } = useSession();
+  const { data, isPending, isError, refetch } = useDashboard();
+  const [openBooking, setOpenBooking] = useState<number | null>(null);
+  const [booking, setBooking] = useState(false);
   const firstName = session?.user.fullName.split(" ")[0] ?? "";
+  const canBook = can(session?.user, Permission.BookingsManage);
+
+  // A section is shown while loading, then only if this user may see it (the API sends null otherwise).
+  const show = (section: unknown) => isPending || section !== null;
 
   return (
     <RequirePermission permission={Permission.DashboardView}>
@@ -32,60 +39,55 @@ export default function DashboardPage() {
         description={new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
       />
 
-      {/* Stat cards: values appear once bookings and customers are live (no invented numbers). */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        {STAT_CARDS.map(({ label, icon: Icon, tint }, i) => (
-          <motion.div
-            key={label}
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.05 + i * 0.06, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ y: -3 }}
-          >
-            <Card className="relative h-full overflow-hidden p-4 sm:p-5">
-              <div className={`absolute inset-0 bg-gradient-to-br ${tint.split(" ").slice(0, 2).join(" ")}`} aria-hidden />
-              <div className="relative flex items-start justify-between">
-                <p className="text-[13px] font-medium leading-snug text-muted sm:text-sm">{label}</p>
-                <span className={`hidden size-9 shrink-0 items-center sm:flex justify-center rounded-xl bg-surface shadow-card ${tint.split(" ")[2]}`}>
-                  <Icon className="size-[18px]" />
-                </span>
-              </div>
-              <p className="relative mt-4 font-display text-3xl font-bold tracking-tight text-muted/50">—</p>
-              <p className="relative mt-1 hidden text-xs text-muted sm:block">Starts counting once bookings are live</p>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader title="Today's Appointments" description="Consultations booked for today" />
+      {isError ? (
+        <Card>
           <EmptyState
-            icon={CalendarDays}
-            title="No consultations today"
-            description="Your calendar is clear. Booked consultations will appear here with their time and treatments."
+            icon={CircleAlert}
+            title="Couldn't load the dashboard"
+            description="Check your connection and try again."
+            action={
+              <Button variant="secondary" onClick={() => refetch()}>
+                <RotateCcw className="size-4" /> Try again
+              </Button>
+            }
           />
         </Card>
+      ) : (
+        <>
+          <StatCards data={data} />
 
-        <Card>
-          <CardHeader title="Potential Customers" description="Customers by stage" />
-          <EmptyState
-            icon={ListChecks}
-            title="No customers yet"
-            description="Once customers are captured, you'll see how many sit in each stage."
-          />
-        </Card>
+          {/* Two independent columns, so a long list on one side never leaves a gap on the other. */}
+          <div className="mt-6 grid items-start gap-6 xl:grid-cols-3 [&>*]:min-w-0">
+            <div className="space-y-6 xl:col-span-2">
+              {show(data?.todaysAppointments) && (
+                <TodaysAppointments
+                  items={data?.todaysAppointments ?? undefined}
+                  loading={isPending}
+                  onOpen={setOpenBooking}
+                  onBook={canBook ? () => setBooking(true) : undefined}
+                />
+              )}
+              {show(data?.followUps) && <FollowUps items={data?.followUps ?? undefined} loading={isPending} />}
+            </div>
+            <div className="space-y-6">
+              {show(data?.stages) && <StageSummary stages={data?.stages ?? undefined} loading={isPending} />}
+              {show(data?.activity) && (
+                <RecentActivity items={data?.activity ?? undefined} loading={isPending} onOpenBooking={setOpenBooking} />
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
-        <Card className="xl:col-span-2">
-          <CardHeader title="Follow-ups" description="Customers due for a follow-up" />
-          <EmptyState icon={Bell} title="Nothing to follow up" description="Customers with a follow-up date will show here." />
-        </Card>
-
-        <Card>
-          <CardHeader title="Recent Activity" />
-          <EmptyState icon={Sparkles} title="No activity yet" description="New customers, bookings and completions will appear here." />
-        </Card>
-      </div>
+      <BookingDetailsDrawer bookingId={openBooking} onClose={() => setOpenBooking(null)} onBookingChange={setOpenBooking} />
+      {canBook && (
+        <BookingFormDrawer
+          open={booking}
+          onClose={() => setBooking(false)}
+          prefill={data ? { date: data.today } : undefined}
+          onSaved={() => setBooking(false)}
+        />
+      )}
     </RequirePermission>
   );
 }

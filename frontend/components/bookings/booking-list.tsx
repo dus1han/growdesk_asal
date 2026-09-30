@@ -31,7 +31,7 @@ const TABS = [
   { id: "today", label: "Today", empty: "No consultations today", hint: "Your calendar is clear." },
   { id: "history", label: "History", empty: "No past consultations", hint: "Completed, cancelled, rescheduled and no-show consultations appear here." },
 ] as const;
-type Tab = (typeof TABS)[number]["id"];
+export type Tab = (typeof TABS)[number]["id"];
 
 /** Which filters each tab offers. The doctor filter is shared by all tabs. */
 const TAB_FILTERS: Record<Tab, { range: boolean; status: boolean; payment: boolean }> = {
@@ -98,10 +98,10 @@ function toQueryString(q: object) {
  * The bookings list: Upcoming, Today and History, each with its own filters and an Excel export
  * of exactly what is shown. The page around it owns the booking drawers.
  */
-export function BookingList({ onOpen, onBook }: { onOpen: (id: number) => void; onBook?: () => void }) {
+export function BookingList({ onOpen, onBook, initialTab = "upcoming" }: { onOpen: (id: number) => void; onBook?: () => void; initialTab?: Tab }) {
   const { data: session } = useSession();
   const { data: locale } = useLocale();
-  const [tab, setTab] = useState<Tab>("upcoming");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [page, setPage] = useState(1);
   const [doctor, setDoctor] = useState<string | undefined>();
   // Each tab remembers its own filters.

@@ -1,6 +1,6 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MotionConfig } from "framer-motion";
 import { useState } from "react";
 import { Toaster } from "sonner";
@@ -8,8 +8,12 @@ import { ApiError } from "@/lib/api/client";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
-    () =>
-      new QueryClient({
+    () => {
+      const client: QueryClient = new QueryClient({
+        // Any successful change (booking, completion, customer, payment) can move a dashboard figure.
+        mutationCache: new MutationCache({
+          onSuccess: () => void client.invalidateQueries({ queryKey: ["dashboard"] }),
+        }),
         defaultOptions: {
           queries: {
             staleTime: 30_000,
@@ -18,7 +22,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
             retry: (count, error) => count < 1 && !(error instanceof ApiError && error.status >= 400 && error.status < 500),
           },
         },
-      }),
+      });
+      return client;
+    },
   );
 
   return (

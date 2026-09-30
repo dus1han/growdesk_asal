@@ -9,14 +9,10 @@ import {
   Check,
   ChevronDown,
   CircleAlert,
-  Layers,
   Mail,
   MessageCircle,
   Pencil,
   Phone,
-  Sparkles,
-  UserPlus,
-  UserRoundPen,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -36,13 +32,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toastError } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
+import { describeActivity } from "@/components/activity/describe-activity";
 import { toSavePayload, useActiveLookup, useCustomer, useCustomerActivity, useSaveCustomer } from "@/lib/api/customers";
 import { useSession } from "@/lib/auth/session";
 import { followUpState, formatDate } from "@/lib/dates";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { can, Permission } from "@/lib/permissions";
 import { cn, initials } from "@/lib/utils";
-import type { Activity, CustomerDetail } from "@/types/customers";
+import type { CustomerDetail } from "@/types/customers";
 
 export default function CustomerProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -319,56 +316,6 @@ function FollowUpValue({ date }: { date: string | null }) {
 
 // ---- Activity timeline ---------------------------------------------------------------------------
 
-const FIELD_NAMES: Record<string, string> = {
-  Name: "name",
-  WhatsAppNumber: "WhatsApp",
-  SecondaryPhone: "secondary number",
-  InstagramName: "Instagram",
-  Email: "email",
-  LeadSourceId: "lead source",
-  AssignedUserId: "assignee",
-  LastContactDate: "last contact",
-  NextFollowUpDate: "follow-up date",
-  Notes: "notes",
-};
-
-function describe(a: Activity): { icon: LucideIcon; title: string; detail?: string; tone: string } {
-  const d = a.details ?? {};
-  switch (a.action) {
-    case "Customer Created":
-      return { icon: UserPlus, title: "Customer added", tone: "bg-emerald-50 text-emerald-600" };
-    case "Stage Changed":
-      return { icon: Layers, title: `Moved to ${String(d.to ?? "")}`, detail: d.from ? `from ${String(d.from)}` : undefined, tone: "bg-brand-soft text-brand" };
-    case "Treatment Added": {
-      const list = Array.isArray(d.treatments) ? (d.treatments as string[]).join(", ") : "";
-      return { icon: Sparkles, title: `Interested in ${list}`, tone: "bg-fuchsia-50 text-fuchsia-600" };
-    }
-    case "Booking Created":
-      return { icon: CalendarPlus, title: "Consultation booked", detail: d.date ? `for ${formatDate(String(d.date))}` : undefined, tone: "bg-brand-soft text-brand" };
-    case "Consultation Completed":
-      return { icon: Check, title: "Consultation completed", detail: d.payment ? `Payment ${String(d.payment).toLowerCase()}` : undefined, tone: "bg-emerald-50 text-emerald-600" };
-    case "Booking Rescheduled": {
-      const to = d.to as { date?: string } | undefined;
-      return { icon: CalendarPlus, title: "Appointment rescheduled", detail: to?.date ? `to ${formatDate(to.date)}` : undefined, tone: "bg-amber-50 text-amber-600" };
-    }
-    case "Booking Cancelled":
-      return { icon: CircleAlert, title: "Booking cancelled", detail: d.reason ? String(d.reason) : undefined, tone: "bg-slate-100 text-slate-500" };
-    case "No Show":
-      return { icon: CircleAlert, title: "Did not attend", tone: "bg-red-50 text-red-600" };
-    case "Payment Recorded":
-    case "Booking Updated":
-      return { icon: UserRoundPen, title: a.action === "Payment Recorded" ? "Payment recorded" : "Booking updated", tone: "bg-sky-50 text-sky-600" };
-    case "Customer Updated": {
-      const fields = Array.isArray(d.fields)
-        ? (d.fields as string[]).filter((f) => f !== "StageId").map((f) => FIELD_NAMES[f] ?? f)
-        : [];
-      return { icon: UserRoundPen, title: "Details updated", detail: fields.length ? `Changed ${fields.join(", ")}` : undefined, tone: "bg-sky-50 text-sky-600" };
-    }
-    default:
-      return { icon: UserRoundPen, title: a.action, tone: "bg-surface-muted text-muted" };
-  }
-}
-
 function ActivityCard({ id }: { id: number }) {
   const { data, isPending } = useCustomerActivity(id);
   return (
@@ -392,7 +339,7 @@ function ActivityCard({ id }: { id: number }) {
         ) : (
           <ol className="relative space-y-5 before:absolute before:bottom-2 before:left-4 before:top-2 before:w-px before:bg-line">
             {data.map((a, i) => {
-              const { icon: Icon, title, detail, tone } = describe(a);
+              const { icon: Icon, title, detail, tone } = describeActivity(a);
               return (
                 <motion.li
                   key={a.id}
