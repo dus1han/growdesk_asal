@@ -18,15 +18,28 @@ public partial class ContactNormalizer(IConfiguration config)
     [GeneratedRegex(@"^[a-z0-9._]{1,30}$")]
     private static partial Regex InstagramHandle();
 
-    /// <summary>E.164, or null when the text is not a valid phone number.</summary>
+    /// <summary>
+    /// E.164, or null when the text is not a valid phone number. Any country is accepted:
+    /// "+94 77…" and "0094 77…" are international; a number without a prefix is tried as a local
+    /// number (default region) first, then as international digits ("94771234567").
+    /// </summary>
     public string? NormalizePhone(string? input)
     {
         if (string.IsNullOrWhiteSpace(input)) return null;
         var text = input.Trim();
         if (text.StartsWith("00")) text = "+" + text[2..];
+
+        var parsed = TryParse(text, _defaultRegion);
+        if (parsed is null && !text.StartsWith('+'))
+            parsed = TryParse("+" + new string(text.Where(char.IsDigit).ToArray()), null);
+        return parsed;
+    }
+
+    private static string? TryParse(string text, string? region)
+    {
         try
         {
-            var number = Phones.Parse(text, _defaultRegion);
+            var number = Phones.Parse(text, region);
             return Phones.IsValidNumber(number) ? Phones.Format(number, PhoneNumberFormat.E164) : null;
         }
         catch (NumberParseException)

@@ -155,7 +155,7 @@ Frontend
 - [x] Customer profile: header, treatment badges, upcoming booking, booking history, activity timeline
 - [x] Audit log service called from every mutating service method (§42)
 
-**Notes:** a customer needs a name plus a WhatsApp number or Instagram name (matching the capture toolbar). WhatsApp and Instagram are both normalised and unique when present. Local UAE numbers are accepted (Phone:DefaultRegion = AE).
+**Notes:** a customer needs a name plus a WhatsApp number or Instagram name (matching the capture toolbar). WhatsApp and Instagram are both normalised and unique when present. Numbers from any country are accepted with their country code (+94…, 0094… or 94…); UAE numbers also work without it (Phone:DefaultRegion = AE).
 
 **Done when:** duplicate WhatsApp numbers are rejected in any format, and filters combine correctly.
 

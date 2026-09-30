@@ -193,7 +193,7 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
         // ---- Contact details, normalised; one identifier is required ----
         var whatsApp = contacts.NormalizePhone(r.WhatsApp);
         if (!string.IsNullOrWhiteSpace(r.WhatsApp) && whatsApp is null)
-            throw new BusinessRuleException("Enter a valid WhatsApp number. Add the country code for numbers outside the UAE.", field: "whatsApp");
+            throw new BusinessRuleException("Enter a valid WhatsApp number with its country code, e.g. +94 77 123 4567.", field: "whatsApp");
 
         var instagram = ContactNormalizer.NormalizeInstagram(r.Instagram);
         if (!string.IsNullOrWhiteSpace(r.Instagram) && instagram is null)
@@ -206,7 +206,7 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
         if (!string.IsNullOrWhiteSpace(r.SecondaryPhone))
         {
             secondary = contacts.NormalizePhone(r.SecondaryPhone)
-                ?? throw new BusinessRuleException("Enter a valid secondary number.", field: "secondaryPhone");
+                ?? throw new BusinessRuleException("Enter a valid secondary number with its country code.", field: "secondaryPhone");
         }
 
         await EnsureNotDuplicateAsync(whatsApp, instagram, customer.Id, ct);

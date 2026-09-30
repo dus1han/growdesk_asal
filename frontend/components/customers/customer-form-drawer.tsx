@@ -218,8 +218,8 @@ function CustomerForm({
           {(p) => <Input {...p} autoFocus autoComplete="off" {...register("name")} />}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="WhatsApp" hint="Local UAE numbers are fine." error={errors.whatsApp?.message}>
-            {(p) => <Input {...p} type="tel" inputMode="tel" placeholder="050 123 4567" autoComplete="off" {...register("whatsApp")} />}
+          <Field label="WhatsApp" hint="Any country, with its code (e.g. +94…). UAE numbers work without it." error={errors.whatsApp?.message}>
+            {(p) => <Input {...p} type="tel" inputMode="tel" placeholder="+971 50 123 4567" autoComplete="off" {...register("whatsApp")} />}
           </Field>
           <Field label="Instagram" error={errors.instagram?.message}>
             {(p) => <Input {...p} placeholder="@username" autoCapitalize="none" spellCheck={false} autoComplete="off" {...register("instagram")} />}

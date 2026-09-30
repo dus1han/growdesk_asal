@@ -17,6 +17,12 @@ public class ContactNormalizerTests
     [InlineData("00971501234567", "+971501234567")]
     [InlineData("971501234567", "+971501234567")]
     [InlineData("+94 77 123 4567", "+94771234567")]
+    [InlineData("0094 77 123 4567", "+94771234567")]
+    [InlineData("94771234567", "+94771234567")]         // international digits without "+"
+    [InlineData("+44 7911 123456", "+447911123456")]
+    [InlineData("447911123456", "+447911123456")]
+    [InlineData("+61 412 345 678", "+61412345678")]
+    [InlineData("+1 415 555 2671", "+14155552671")]
     [InlineData("12345", null)]
     [InlineData("not a number", null)]
     public void Normalizes_phone_numbers(string input, string? expected) =>
