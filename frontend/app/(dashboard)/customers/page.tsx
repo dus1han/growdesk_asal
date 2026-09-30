@@ -19,6 +19,7 @@ import { useCustomerFilters } from "@/hooks/use-customer-filters";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { CUSTOMER_PAGE_SIZE, useActiveLookup, useCustomers, useUserOptions } from "@/lib/api/customers";
 import { useSession } from "@/lib/auth/session";
+import { formatTime } from "@/components/bookings/booking-status";
 import { CREATED_PRESETS, followUpState, FOLLOW_UP_PRESETS, formatDate } from "@/lib/dates";
 import { can, Permission } from "@/lib/permissions";
 import { cn, initials } from "@/lib/utils";
@@ -190,6 +191,7 @@ function CustomerTable({ items, onOpen }: { items: CustomerListItem[]; onOpen: (
             <th className="px-4 py-3 font-semibold">WhatsApp</th>
             <th className="px-4 py-3 font-semibold">Treatments</th>
             <th className="px-4 py-3 font-semibold">Stage</th>
+            <th className="px-4 py-3 font-semibold">Next booking</th>
             <th className="px-4 py-3 font-semibold">Follow-up</th>
             <th className="px-4 py-3 font-semibold">Created</th>
           </tr>
@@ -226,6 +228,16 @@ function CustomerTable({ items, onOpen }: { items: CustomerListItem[]; onOpen: (
               <td className="px-4 py-3">
                 <StageBadge name={c.stage.name} color={c.stage.color} />
               </td>
+              <td className="whitespace-nowrap px-4 py-3">
+                {c.nextBooking ? (
+                  <span className="font-medium">
+                    {formatDate(c.nextBooking.date)}
+                    <span className="text-muted"> · {formatTime(c.nextBooking.startTime)}</span>
+                  </span>
+                ) : (
+                  <span className="text-muted">—</span>
+                )}
+              </td>
               <td className="px-4 py-3">
                 <FollowUp date={c.nextFollowUpDate} />
               </td>
@@ -257,6 +269,11 @@ function CustomerCards({ items, onOpen }: { items: CustomerListItem[]; onOpen: (
                 {[c.whatsApp, c.instagram && `@${c.instagram}`].filter(Boolean).join(" · ")}
               </p>
               <TreatmentChips treatments={c.treatments} max={3} />
+              {c.nextBooking && (
+                <p className="text-xs text-muted">
+                  Booked: <span className="font-medium text-foreground">{formatDate(c.nextBooking.date)}, {formatTime(c.nextBooking.startTime)}</span>
+                </p>
+              )}
               {c.nextFollowUpDate && (
                 <p className="text-xs text-muted">
                   Follow-up: <FollowUp date={c.nextFollowUpDate} />

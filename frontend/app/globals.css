@@ -96,3 +96,80 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---- FullCalendar, themed to GrowDesk (scoped to .gd-calendar) ---------------------------- */
+.gd-calendar .fc {
+  --fc-border-color: var(--line);
+  --fc-page-bg-color: var(--surface);
+  --fc-neutral-bg-color: var(--surface-muted);
+  --fc-today-bg-color: rgb(91 91 246 / 0.045);
+  --fc-now-indicator-color: var(--danger);
+  --fc-event-border-color: transparent;
+  --fc-list-event-hover-bg-color: var(--brand-soft);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 12px;
+}
+.gd-calendar .fc .fc-scrollgrid {
+  border-radius: 14px;
+  overflow: hidden;
+}
+.gd-calendar .fc .fc-col-header-cell-cushion,
+.gd-calendar .fc .fc-daygrid-day-number {
+  padding: 8px 6px;
+  font-weight: 600;
+  color: var(--foreground);
+  text-decoration: none;
+}
+.gd-calendar .fc .fc-day-today .fc-col-header-cell-cushion,
+.gd-calendar .fc .fc-day-today .fc-daygrid-day-number {
+  color: var(--brand-strong);
+}
+.gd-calendar .fc .fc-timegrid-slot-label-cushion,
+.gd-calendar .fc .fc-list-day-cushion {
+  color: var(--muted);
+  font-weight: 500;
+}
+.gd-calendar .fc .fc-timegrid-slot {
+  height: 3.4em;
+}
+.gd-calendar .fc .fc-timegrid-slot-minor {
+  border-top-style: dashed;
+}
+.gd-calendar .fc .fc-timegrid-event,
+.gd-calendar .fc .fc-daygrid-event {
+  border-radius: 8px;
+  border-width: 0 0 0 3px;
+  border-style: solid;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.gd-calendar .fc .fc-timegrid-event:hover,
+.gd-calendar .fc .fc-daygrid-event:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -6px rgb(15 23 42 / 0.25);
+  z-index: 5;
+}
+.gd-calendar .fc .gd-event-rescheduled,
+.gd-calendar .fc .gd-event-cancelled {
+  border-style: dashed;
+  border-width: 1px 1px 1px 3px;
+}
+.gd-calendar .fc .fc-timegrid-col.fc-day-today,
+.gd-calendar .fc .fc-daygrid-day.fc-day-today {
+  background: var(--fc-today-bg-color);
+}
+.gd-calendar .fc .fc-highlight {
+  background: rgb(91 91 246 / 0.12);
+}
+.gd-calendar .fc .fc-timegrid-col:hover,
+.gd-calendar .fc .fc-daygrid-day:hover {
+  background-color: rgb(91 91 246 / 0.025);
+}
+.gd-calendar .fc .fc-list-event {
+  cursor: pointer;
+}
+.gd-calendar .fc .fc-list-empty {
+  background: var(--surface);
+  color: var(--muted);
+}

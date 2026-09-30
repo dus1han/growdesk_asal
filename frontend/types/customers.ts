@@ -29,6 +29,7 @@ export interface CustomerListItem {
   leadSource: string | null;
   assignedUser: string | null;
   nextFollowUpDate: string | null;
+  nextBooking: { id: number; date: string; startTime: string } | null;
   createdAt: string;
 }
 

@@ -13,7 +13,8 @@ The CRM is built in **8 milestones**. Each one ends with both apps building, mig
 | 1 — Foundation and login | **Done** (2026-09-30) |
 | 2 — Administration | **Done** (2026-09-30) |
 | 3 — Customers | **Done** (2026-09-30) |
-| 4 — Bookings and calendar | Next |
+| 4 — Bookings and calendar | **Done** (2026-09-30) |
+| 5 — Payments | Next |
 
 ### Environment as built
 
@@ -159,16 +160,18 @@ Frontend
 **Done when:** duplicate WhatsApp numbers are rejected in any format, and filters combine correctly.
 
 ### Milestone 4 — Bookings and calendar (§19–§27) — most business-critical
-- [ ] Tables: `bookings`, `booking_treatments` (unique `booking_id + treatment_id`), `original_booking_id`
-- [ ] One booking state machine: `Booked → Completed | Rescheduled | Cancelled | NoShow`; all other transitions rejected
-- [ ] Booking drawer: customer autocomplete, date/time, multiple treatments, that day's existing bookings, overlap check
-- [ ] Calendar (FullCalendar): day / **week (default)** / month / agenda; status colours; click opens details
-- [ ] Booking details with Complete / Reschedule / Cancel / No-show actions
-- [ ] Complete consultation: charge, payment status/method, optional next treatment, notes
-- [ ] **Next-treatment rule:** date and treatment both empty or both filled — Zod (frontend) **and** FluentValidation (backend)
-- [ ] Reschedule: original → `Rescheduled`, charge 0; new `Booked` booking copies customer, treatments, doctor; linked via `original_booking_id`
-- [ ] Cancel with admin-configured reason; No-show; nothing is ever deleted
-- [ ] Stage automation: booking → Booked; completion → Consultation Completed
+- [x] Tables: `bookings`, `booking_treatments` (unique `booking_id + treatment_id`), `original_booking_id`
+- [x] One booking state machine: `Booked → Completed | Rescheduled | Cancelled | NoShow`; all other transitions rejected
+- [x] Booking drawer: customer autocomplete, date/time, multiple treatments, that day's existing bookings, overlap check
+- [x] Calendar (FullCalendar): day / **week (default)** / month / agenda; status colours; click opens details
+- [x] Booking details with Complete / Reschedule / Cancel / No-show actions
+- [x] Complete consultation: charge, payment status/method, optional next treatment, notes
+- [x] **Next-treatment rule:** date and treatment both empty or both filled — Zod (frontend) **and** FluentValidation (backend)
+- [x] Reschedule: original → `Rescheduled`, charge 0; new `Booked` booking copies customer, treatments, doctor; linked via `original_booking_id`
+- [x] Cancel with admin-configured reason; No-show; nothing is ever deleted
+- [x] Stage automation: booking → Booked; completion → Consultation Completed
+
+**Notes:** the payments table is created here (completion records the payment); Milestone 5 adds the payments screens. Doctor is optional; bookings without a doctor share one calendar for the overlap check. No-show is only possible from the booking's date.
 
 **Done when:** every state transition and the next-treatment rule have passing backend tests.
 

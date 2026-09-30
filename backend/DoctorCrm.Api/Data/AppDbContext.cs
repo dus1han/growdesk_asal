@@ -23,6 +23,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerTreatment> CustomerTreatments => Set<CustomerTreatment>();
     public DbSet<CustomerCustomFieldValue> CustomerCustomFieldValues => Set<CustomerCustomFieldValue>();
+    public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<BookingTreatment> BookingTreatments => Set<BookingTreatment>();
+    public DbSet<Payment> Payments => Set<Payment>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -144,6 +147,49 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Value).HasMaxLength(4000).IsRequired();
             e.HasOne(x => x.Customer).WithMany(x => x.CustomFieldValues).HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.CustomField).WithMany().HasForeignKey(x => x.CustomFieldId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Booking>(e =>
+        {
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.Property(x => x.DoctorNotes).HasMaxLength(4000);
+            e.Property(x => x.CancellationNote).HasMaxLength(1000);
+            e.Property(x => x.ConsultationCharge).HasPrecision(12, 2);
+
+            // Calendar ranges and the per-doctor overlap check.
+            e.HasIndex(x => new { x.BookingDate, x.StartTime });
+            e.HasIndex(x => new { x.DoctorId, x.BookingDate });
+            e.HasIndex(x => x.CustomerId);
+            e.HasIndex(x => x.OriginalBookingId);
+
+            e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.NextTreatment).WithMany().HasForeignKey(x => x.NextTreatmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.OriginalBooking).WithMany().HasForeignKey(x => x.OriginalBookingId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.CancellationReason).WithMany().HasForeignKey(x => x.CancellationReasonId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<BookingTreatment>(e =>
+        {
+            // Spec §41: a treatment appears once per booking.
+            e.HasIndex(x => new { x.BookingId, x.TreatmentId }).IsUnique();
+            e.HasOne(x => x.Booking).WithMany(x => x.Treatments).HasForeignKey(x => x.BookingId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Treatment).WithMany().HasForeignKey(x => x.TreatmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Payment>(e =>
+        {
+            e.Property(x => x.Amount).HasPrecision(12, 2);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.BookingId);
+            e.HasIndex(x => x.CustomerId);
+            e.HasIndex(x => x.CreatedAt);
+            e.HasOne(x => x.Booking).WithMany(x => x.Payments).HasForeignKey(x => x.BookingId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.SetNull);
         });
 
         b.Entity<SystemSetting>(e =>

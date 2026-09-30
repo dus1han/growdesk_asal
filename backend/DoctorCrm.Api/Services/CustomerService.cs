@@ -52,6 +52,7 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
         if (q.FollowUpTo is { } ft) query = query.Where(c => c.NextFollowUpDate <= ft);
 
         var total = await query.CountAsync(ct);
+        var today = await clock.TodayAsync(ct);
         var rows = await query
             .OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
             .Skip((page - 1) * size).Take(size)
@@ -68,13 +69,18 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
                 AssignedUser = c.AssignedUser != null ? c.AssignedUser.FullName : null,
                 c.NextFollowUpDate,
                 c.CreatedAt,
+                NextBooking = db.Bookings
+                    .Where(b => b.CustomerId == c.Id && b.Status == BookingStatus.Booked && b.BookingDate >= today)
+                    .OrderBy(b => b.BookingDate).ThenBy(b => b.StartTime)
+                    .Select(b => new NextBookingDto(b.Id, b.BookingDate, b.StartTime))
+                    .FirstOrDefault(),
             })
             .AsSplitQuery()
             .ToListAsync(ct);
 
         var items = rows.Select(r => new CustomerListItemDto(
             r.Id, r.Name, Phone(r.WhatsAppNumber), r.InstagramName, r.Stage, r.Treatments,
-            r.LeadSource, r.AssignedUser, r.NextFollowUpDate, r.CreatedAt)).ToList();
+            r.LeadSource, r.AssignedUser, r.NextFollowUpDate, r.NextBooking, r.CreatedAt)).ToList();
         return new PagedResult<CustomerListItemDto>(items, page, size, total);
     }
 
@@ -168,8 +174,10 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
     {
         if (!await db.Customers.AnyAsync(c => c.Id == id, ct)) throw BusinessRuleException.NotFound("Customer");
         var key = id.ToString();
+        var bookingKeys = await db.Bookings.Where(b => b.CustomerId == id).Select(b => b.Id.ToString()).ToListAsync(ct);
         var rows = await db.AuditLogs.AsNoTracking()
-            .Where(a => a.EntityType == nameof(Customer) && a.EntityId == key)
+            .Where(a => (a.EntityType == nameof(Customer) && a.EntityId == key)
+                        || (a.EntityType == nameof(Booking) && bookingKeys.Contains(a.EntityId!)))
             .OrderByDescending(a => a.CreatedAt).ThenByDescending(a => a.Id)
             .Take(100)
             .Select(a => new { a.Id, a.Action, UserName = a.User != null ? a.User.FullName : null, a.CreatedAt, a.Metadata })

@@ -9,7 +9,7 @@ export const CUSTOMER_PAGE_SIZE = 20;
 
 // ---- Active lookups for forms and filters ----------------------------------------------------------
 
-type ActiveLookup = "treatments" | "stages" | "lead-sources";
+type ActiveLookup = "treatments" | "stages" | "lead-sources" | "payment-methods" | "cancellation-reasons";
 
 export function useActiveLookup(resource: ActiveLookup) {
   return useQuery({

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   AtSign,
+  CalendarPlus,
   Check,
   ChevronDown,
   CircleAlert,
@@ -22,6 +23,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { BookingDetailsDrawer } from "@/components/bookings/booking-details-drawer";
+import { BookingFormDrawer } from "@/components/bookings/booking-form-drawer";
+import { CustomerBookingsCard } from "@/components/customers/customer-bookings-card";
 import { CustomerFormDrawer } from "@/components/customers/customer-form-drawer";
 import { StageBadge } from "@/components/customers/stage-badge";
 import { RequirePermission } from "@/components/layout/require-permission";
@@ -52,7 +56,11 @@ function Profile({ id }: { id: number }) {
   const { data: customer, isPending, error } = useCustomer(id);
   const { data: session } = useSession();
   const canManage = can(session?.user, Permission.CustomersManage);
+  const canBook = can(session?.user, Permission.BookingsManage);
+  const canSeeBookings = can(session?.user, Permission.BookingsView);
   const [editing, setEditing] = useState(false);
+  const [booking, setBooking] = useState(false);
+  const [openBookingId, setOpenBookingId] = useState<number | null>(null);
 
   if (isPending) return <ProfileSkeleton />;
   if (error || !customer) {
@@ -80,10 +88,14 @@ function Profile({ id }: { id: number }) {
         <ArrowLeft className="size-4" /> Customers
       </Link>
 
-      <ProfileHeader customer={customer} canManage={canManage} onEdit={() => setEditing(true)} />
+      <ProfileHeader customer={customer} canManage={canManage} onEdit={() => setEditing(true)} onBook={canBook ? () => setBooking(true) : undefined} />
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
+          {canSeeBookings && (
+            <CustomerBookingsCard customerId={customer.id} onOpen={setOpenBookingId} onBook={canBook ? () => setBooking(true) : undefined} />
+          )}
+
           <Card>
             <CardHeader title="Interested treatments" />
             <div className="flex flex-wrap gap-2 p-5">
@@ -140,11 +152,28 @@ function Profile({ id }: { id: number }) {
       </div>
 
       <CustomerFormDrawer open={editing} onClose={() => setEditing(false)} customer={customer} />
+      <BookingFormDrawer
+        open={booking}
+        onClose={() => setBooking(false)}
+        prefill={{ customer: { id: customer.id, name: customer.name, treatmentIds: customer.treatments.map((t) => t.id) } }}
+        onSaved={(b) => setOpenBookingId(b.id)}
+      />
+      <BookingDetailsDrawer bookingId={openBookingId} onClose={() => setOpenBookingId(null)} onBookingChange={setOpenBookingId} />
     </>
   );
 }
 
-function ProfileHeader({ customer, canManage, onEdit }: { customer: CustomerDetail; canManage: boolean; onEdit: () => void }) {
+function ProfileHeader({
+  customer,
+  canManage,
+  onEdit,
+  onBook,
+}: {
+  customer: CustomerDetail;
+  canManage: boolean;
+  onEdit: () => void;
+  onBook?: () => void;
+}) {
   const waDigits = customer.whatsApp?.replace(/\D/g, "");
   return (
     <Card className="relative overflow-hidden p-5 sm:p-6">
@@ -170,11 +199,18 @@ function ProfileHeader({ customer, canManage, onEdit }: { customer: CustomerDeta
             </div>
           </div>
         </div>
-        {canManage && (
-          <Button variant="secondary" onClick={onEdit} className="self-start">
-            <Pencil className="size-4" /> Edit
-          </Button>
-        )}
+        <div className="flex gap-2 self-start">
+          {canManage && (
+            <Button variant="secondary" onClick={onEdit}>
+              <Pencil className="size-4" /> Edit
+            </Button>
+          )}
+          {onBook && (
+            <Button onClick={onBook}>
+              <CalendarPlus className="size-4" /> Book consultation
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="relative mt-5 flex flex-wrap gap-2">
@@ -302,6 +338,21 @@ function describe(a: Activity): { icon: LucideIcon; title: string; detail?: stri
       const list = Array.isArray(d.treatments) ? (d.treatments as string[]).join(", ") : "";
       return { icon: Sparkles, title: `Interested in ${list}`, tone: "bg-fuchsia-50 text-fuchsia-600" };
     }
+    case "Booking Created":
+      return { icon: CalendarPlus, title: "Consultation booked", detail: d.date ? `for ${formatDate(String(d.date))}` : undefined, tone: "bg-brand-soft text-brand" };
+    case "Consultation Completed":
+      return { icon: Check, title: "Consultation completed", detail: d.payment ? `Payment ${String(d.payment).toLowerCase()}` : undefined, tone: "bg-emerald-50 text-emerald-600" };
+    case "Booking Rescheduled": {
+      const to = d.to as { date?: string } | undefined;
+      return { icon: CalendarPlus, title: "Appointment rescheduled", detail: to?.date ? `to ${formatDate(to.date)}` : undefined, tone: "bg-amber-50 text-amber-600" };
+    }
+    case "Booking Cancelled":
+      return { icon: CircleAlert, title: "Booking cancelled", detail: d.reason ? String(d.reason) : undefined, tone: "bg-slate-100 text-slate-500" };
+    case "No Show":
+      return { icon: CircleAlert, title: "Did not attend", tone: "bg-red-50 text-red-600" };
+    case "Payment Recorded":
+    case "Booking Updated":
+      return { icon: UserRoundPen, title: a.action === "Payment Recorded" ? "Payment recorded" : "Booking updated", tone: "bg-sky-50 text-sky-600" };
     case "Customer Updated": {
       const fields = Array.isArray(d.fields)
         ? (d.fields as string[]).filter((f) => f !== "StageId").map((f) => FIELD_NAMES[f] ?? f)

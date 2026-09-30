@@ -34,7 +34,10 @@ public record CustomerListItemDto(
     string? LeadSource,
     string? AssignedUser,
     DateOnly? NextFollowUpDate,
+    NextBookingDto? NextBooking,
     DateTime CreatedAt);
+
+public record NextBookingDto(int Id, DateOnly Date, TimeOnly StartTime);
 
 /// <summary>
 /// A custom field value, typed by field: string (text, long text, phone, email, date as yyyy-MM-dd),

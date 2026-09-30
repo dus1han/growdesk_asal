@@ -21,6 +21,10 @@ public class ClinicClock(AppDbContext db)
         return _zone;
     }
 
+    /// <summary>Today's date in the clinic's time zone.</summary>
+    public async Task<DateOnly> TodayAsync(CancellationToken ct) =>
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, await ZoneAsync(ct)));
+
     /// <summary>UTC instant at which the given clinic-local date starts.</summary>
     public async Task<DateTime> StartOfDayUtcAsync(DateOnly date, CancellationToken ct) =>
         TimeZoneInfo.ConvertTimeToUtc(date.ToDateTime(TimeOnly.MinValue), await ZoneAsync(ct));
