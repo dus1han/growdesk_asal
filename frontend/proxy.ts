@@ -29,5 +29,7 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Skip the API proxy, Next.js internals and static files.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|robots.txt|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)"],
+  // Also public: the capture extension download and Chrome's update files (/downloads/*, /capture/*).
+  // "capture/" needs the slash, so the /capture-guide page still requires signing in.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|robots.txt|downloads/|capture/|.*\\.(?:svg|png|jpg|jpeg|webp|ico|zip|crx)$).*)"],
 };

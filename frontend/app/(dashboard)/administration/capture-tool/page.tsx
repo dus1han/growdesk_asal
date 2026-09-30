@@ -5,6 +5,7 @@ import { CircleAlert, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { CaptureConnections } from "@/components/admin/capture-connections";
+import { CaptureInstall } from "@/components/capture/capture-install";
 import { CaptureToolbarPreview } from "@/components/admin/capture-toolbar-preview";
 import { fieldTypeMeta } from "@/components/admin/field-types";
 import { SortableList } from "@/components/admin/sortable-list";
@@ -118,6 +119,9 @@ export default function CaptureToolPage() {
           </Card>
 
           <CaptureToolbarPreview fields={fields.filter((f) => f.isEnabled)} />
+          <div className="mt-6">
+            <CaptureInstall />
+          </div>
           <CaptureConnections />
         </>
       )}

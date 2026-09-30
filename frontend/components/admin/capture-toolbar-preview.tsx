@@ -1,8 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Check, ChevronDown, ChevronRight, Play, X } from "lucide-react";
-import { LogoMark } from "@/components/ui/logo";
+import { ChevronRight } from "lucide-react";
+import { MockToolbar } from "@/components/capture/mock-toolbar";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { CaptureField } from "@/types/admin";
@@ -95,108 +95,19 @@ export function CaptureToolbarPreview({ fields }: { fields: CaptureField[] }) {
             </div>
           </div>
 
-          {/* The toolbar */}
-          <div
-            className="relative flex h-12 items-center gap-3 border-b border-line bg-white pl-3.5 pr-3"
-            style={{ boxShadow: "0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -8px rgb(15 23 42 / 0.12)" }}
-          >
-            <motion.span
-              className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-[#7c7cff] via-brand to-accent"
-              initial={false}
-              animate={{ opacity: capturing ? 1 : 0 }}
-            />
-            <span className="flex shrink-0 items-center gap-2">
-              <LogoMark className="size-6" />
-              <span className="text-sm font-bold tracking-tight text-foreground">GrowDesk</span>
-              <span className="text-xs font-medium text-muted">Capture</span>
-            </span>
-            <Divider />
-
-            <AnimatePresence mode="wait" initial={false}>
-              {capturing ? (
-                <motion.span
-                  key="active"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-brand-soft px-2.5 text-xs font-semibold text-brand-strong"
-                >
-                  <span className="size-[7px] rounded-full bg-brand" />
-                  Capturing
-                </motion.span>
-              ) : (
-                <motion.span
-                  key="idle"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-full bg-surface-muted px-2.5 text-xs font-semibold text-muted"
-                >
-                  WhatsApp
-                </motion.span>
-              )}
-            </AnimatePresence>
-            <Divider />
-
-            <motion.span layout className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-              <AnimatePresence initial={false}>
-                {fields.map((f) => {
-                  const value = capturing ? SAMPLE_VALUES[f.key] : undefined;
-                  const set = Boolean(value);
-                  return (
-                    <motion.span
-                      key={f.key}
-                      layout
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 4 }}
-                      transition={{ duration: 0.18 }}
-                      className={cn(
-                        "inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border pl-[7px] pr-2.5 text-[12.5px] font-medium",
-                        set ? "border-brand/25 bg-brand-soft text-foreground" : "border-line bg-white text-muted",
-                        !capturing && "opacity-75",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "inline-flex size-4 shrink-0 items-center justify-center rounded-full",
-                          set ? "bg-gradient-to-br from-brand to-accent text-white" : "border-[1.5px] border-current opacity-55",
-                        )}
-                      >
-                        {set && <Check className="size-2.5" strokeWidth={3.5} />}
-                      </span>
-                      {f.label}
-                      {f.isRequired && !set && <span className="-ml-1 font-bold text-danger">*</span>}
-                      {set && <span className="max-w-[140px] truncate text-xs text-muted">{value}</span>}
-                      {PICK_TYPES.has(f.type) && capturing && <ChevronDown className="-mr-0.5 size-3 text-muted" />}
-                    </motion.span>
-                  );
-                })}
-              </AnimatePresence>
-            </motion.span>
-            <Divider />
-
-            <span className="min-w-[120px] flex-1 truncate text-[12.5px] font-medium text-success">
-              {capturing ? "WhatsApp Number: +971 50 123 4567" : ""}
-            </span>
-
-            {capturing && (
-              <span className="flex size-[30px] shrink-0 items-center justify-center rounded-lg text-muted">
-                <X className="size-4" />
-              </span>
-            )}
-            <span
-              className={cn(
-                "inline-flex h-8 min-w-[88px] shrink-0 items-center justify-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-bold tracking-[0.04em] text-white",
-                capturing
-                  ? "bg-gradient-to-r from-brand to-accent shadow-[0_6px_16px_-8px_rgb(20_184_166/0.9)]"
-                  : "bg-gradient-to-r from-[#7c7cff] to-brand shadow-[0_6px_16px_-8px_rgb(91_91_246/0.9)]",
-              )}
-            >
-              {capturing ? <ArrowRight className="size-3.5" strokeWidth={2.6} /> : <Play className="size-3.5" strokeWidth={2.4} />}
-              {capturing ? "STOP" : "START"}
-            </span>
-          </div>
+          {/* The toolbar: the same mock the animated guide uses. */}
+          <MockToolbar
+            capturing={capturing}
+            chips={fields.map((f) => ({
+              key: f.key,
+              label: f.label,
+              required: f.isRequired,
+              pick: PICK_TYPES.has(f.type),
+              value: capturing ? SAMPLE_VALUES[f.key] : undefined,
+            }))}
+            status={capturing ? "WhatsApp Number: +971 50 123 4567" : undefined}
+            tone="success"
+          />
 
           {/* WhatsApp Web beneath the toolbar */}
           <div className="relative flex h-[352px] bg-[#efeae2]">
@@ -260,8 +171,4 @@ export function CaptureToolbarPreview({ fields }: { fields: CaptureField[] }) {
       </p>
     </section>
   );
-}
-
-function Divider() {
-  return <span className="h-[22px] w-px shrink-0 bg-line" />;
 }

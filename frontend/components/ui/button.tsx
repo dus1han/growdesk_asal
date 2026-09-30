@@ -5,7 +5,7 @@ import { motion, type HTMLMotionProps } from "framer-motion";
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
+export const buttonVariants = cva(
   "relative inline-flex select-none items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-60",
   {
     variants: {

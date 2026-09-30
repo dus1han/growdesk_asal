@@ -223,6 +223,12 @@ connection's client ID + secret over **http or https**, builds its fields from
 `/api/capture/config` and refreshes them automatically (load, tab focus, every minute, before
 saving). Verified end to end against the live server over plain HTTP.
 
+**Toolbar in this repo:** `extension/` (history kept). `npm run publish:growdesk` puts the download and
+signed package into `frontend/public/`; GrowDesk serves `/downloads/growdesk-capture.zip`,
+`/capture/growdesk-capture.crx` and `/capture/update.xml` without sign-in. Every user has a
+**GrowDesk Capture** page (account menu, or the toolbar's ?) with the animated guide and install
+steps. IT steps: [docs/CAPTURE_TOOLBAR_IT.md](docs/CAPTURE_TOOLBAR_IT.md).
+
 **Later:** move GrowDesk to a domain with HTTPS. Over plain HTTP the client secret and leads are
 not encrypted in transit (the toolbar's settings page warns about this).
 

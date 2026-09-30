@@ -42,14 +42,24 @@ Lead source is preset to WhatsApp or Instagram when GrowDesk has a source with t
 
 ## Build
 
+The extension lives in the GrowDesk repository, in `extension/`, next to the web app
+(`frontend/`). Run these from `extension/`:
+
 ```bash
 npm install
-npm run build     # typecheck + logic checks + production build into dist/
-npm run dev       # same build in watch mode
-npm run verify    # logic checks only
-npm run key       # generate key.pem + stable extension ID (run once)
-npm run pack      # signed .crx for distribution
+npm run build             # typecheck + logic checks + production build into dist/
+npm run dev               # same build in watch mode
+npm run verify            # logic checks only
+npm run key               # generate key.pem + stable extension ID (run once)
+npm run pack              # signed .crx for distribution
+npm run publish:growdesk  # pack, then copy the download + package into ../frontend
+npm run serve             # local update server (http://localhost:8787) for a policy-installed PC
 ```
+
+`publish:growdesk` is how a new version reaches users: GrowDesk offers the download on its
+"GrowDesk Capture" page and serves the package for policy installs. See
+[docs/CAPTURE_TOOLBAR_IT.md](../docs/CAPTURE_TOOLBAR_IT.md). Bump the version in `package.json`
+and `public/manifest.json` first.
 
 The extension ID is `mnhjjndckpjiglmdlpelboiebdjcfaid`, fixed by `key.pem` (and the `key` in
 the manifest). Keep that key: losing it changes the ID and invalidates the deployed policy.
@@ -104,4 +114,4 @@ public/manifest.json       MV3 manifest (copied to dist/)
 scripts/                   build, icon drawing, logic checks, packing
 ```
 
-GrowDesk's API is documented in the GrowDesk repository: `docs/CAPTURE_API.md`.
+GrowDesk's API is documented in [docs/CAPTURE_API.md](../docs/CAPTURE_API.md).

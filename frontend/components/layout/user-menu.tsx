@@ -2,7 +2,8 @@
 
 import * as Popover from "@radix-ui/react-popover";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronsUpDown, KeyRound, LogOut } from "lucide-react";
+import { ChevronsUpDown, KeyRound, LogOut, PlayCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { ChangePasswordDrawer } from "@/components/auth/change-password-drawer";
 import { useLogout } from "@/lib/auth/session";
@@ -12,6 +13,7 @@ import type { CurrentUser } from "@/types/api";
 /** The signed-in user at the foot of the sidebar; opens a menu with account actions. */
 export function UserMenu({ user, collapsed }: { user: CurrentUser; collapsed: boolean }) {
   const logout = useLogout();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -90,6 +92,17 @@ export function UserMenu({ user, collapsed }: { user: CurrentUser; collapsed: bo
                     >
                       <KeyRound className="size-4 text-muted" />
                       Change password
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setOpen(false);
+                        router.push("/capture-guide");
+                      }}
+                      className={cn(item, "text-foreground hover:bg-surface-muted focus-visible:bg-surface-muted")}
+                    >
+                      <PlayCircle className="size-4 text-muted" />
+                      GrowDesk Capture
                     </button>
                     <div className="mx-2 my-1 h-px bg-line" role="separator" />
                     <button
