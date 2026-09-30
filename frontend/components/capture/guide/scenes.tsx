@@ -316,6 +316,101 @@ function PickScene({ paused, onDone }: SceneProps) {
   );
 }
 
+// ---- Draw a box (text that can't be highlighted) ------------------------------------------------
+
+/** WhatsApp's Contact info panel, where the name and number can't be selected. */
+function ContactInfoPage({ toolbar, box, menu }: { toolbar: Toolbar; box: number; menu: "none" | "open" | "hover" }) {
+  return (
+    <BrowserFrame url="web.whatsapp.com">
+      <MockToolbar
+        capturing={toolbar.capturing}
+        chips={chips(toolbar.values ?? {})}
+        status={toolbar.status}
+        tone={toolbar.tone}
+        pressed={toolbar.pressed}
+      />
+      <div className="relative flex h-[440px]">
+        <div className="flex-1 bg-[#efeae2] p-6">
+          <div className="max-w-[340px] rounded-lg rounded-tl-none bg-white px-3.5 py-2.5 text-[14px] text-[#111b21] shadow-sm">Good morning, is the clinic open today?</div>
+        </div>
+        <div className="w-[420px] shrink-0 select-none border-l border-black/5 bg-white px-8 pt-8 text-center">
+          <p className="text-left text-[13px] text-[#54656f]">Contact info</p>
+          <div className="mx-auto mt-4 size-28 rounded-full bg-gradient-to-br from-sky-200 to-indigo-200" />
+          <p data-target="ci-name" className="mx-auto mt-4 w-fit text-[20px] font-semibold text-[#111b21]">
+            Mohamed Jaffar
+          </p>
+          <p className="mt-1 text-[14px] text-[#54656f]">+971 56 525 9640</p>
+          <p className="mt-1 text-[13px] text-[#667781]">Other Business</p>
+        </div>
+        {/* Drawing: the page dims and a box grows around the name */}
+        <AnimatePresence>
+          {box > 0 && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/10">
+              {box === 1 && (
+                <p className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-[12.5px] font-semibold text-white shadow-pop">
+                  Drag a box around the name or number. Esc cancels.
+                </p>
+              )}
+              {box >= 2 && (
+                <motion.div
+                  data-target="draw-box-end"
+                  className="absolute rounded-md border-2 border-brand bg-brand/10"
+                  style={{ right: 60, top: 184 }}
+                  initial={{ width: 8, height: 8 }}
+                  animate={{ width: 300, height: 44 }}
+                  transition={{ duration: 0.9, ease: "easeInOut" }}
+                />
+              )}
+              {menu !== "none" && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="absolute right-[120px] top-[226px] w-60 rounded-[14px] border border-line bg-white p-1.5 shadow-pop"
+                >
+                  <p className="mx-1.5 mb-1.5 mt-1 truncate rounded-lg bg-surface-muted px-2.5 py-1.5 text-[12.5px] font-semibold">“Mohamed Jaffar”</p>
+                  <p data-target="draw-set-name" className={cn("rounded-lg px-2.5 py-2 text-[13px]", menu === "hover" && "bg-brand-soft text-brand-strong")}>
+                    Set as Name
+                  </p>
+                  <p className="rounded-lg px-2.5 py-2 text-[13px]">Set as WhatsApp Number</p>
+                  <p className="rounded-lg px-2.5 py-2 text-[13px]">Set as Instagram</p>
+                  <p className="rounded-lg px-2.5 py-2 text-[13px] text-muted">Cancel</p>
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </BrowserFrame>
+  );
+}
+
+function DrawScene({ paused, onDone }: SceneProps) {
+  // 0 start · 1 to Draw · 2 click · 3 hint · 4 press at top-right of name · 5 drag · 6 menu · 7 hover Set as Name · 8 click · 9 saved
+  const p = usePhases([500, 1000, 400, 900, 700, 1200, 700, 700, 400, 2000], { paused, onDone });
+  const saved = p >= 9;
+  const cursorTarget = p >= 7 ? "draw-set-name" : p >= 5 ? "draw-box-end" : p >= 4 ? "ci-name" : p >= 1 ? "draw" : null;
+  return (
+    <>
+      <ContactInfoPage
+        toolbar={{
+          capturing: true,
+          values: saved ? { name: "Mohamed Jaffar" } : {},
+          status: saved ? "Name: Mohamed Jaffar" : undefined,
+          tone: "success",
+          pressed: p === 2 ? "draw" : null,
+        }}
+        box={saved ? 0 : p >= 5 ? 2 : p >= 3 ? 1 : 0}
+        menu={saved ? "none" : p >= 7 ? "hover" : p >= 6 ? "open" : "none"}
+      />
+      <Cursor
+        target={cursorTarget}
+        click={p === 2 || p === 8}
+        offset={cursorTarget === "ci-name" ? [1.12, -0.1] : cursorTarget === "draw-box-end" ? [0, 1] : [0.35, 0.55]}
+      />
+    </>
+  );
+}
+
 // ---- 6. Save --------------------------------------------------------------------------------------
 
 function SaveScene({ paused, onDone }: SceneProps) {
@@ -423,13 +518,18 @@ export const GUIDE_SCENES: GuideScene[] = [
   },
   {
     title: "Highlight the name",
-    text: "Right-click the name and choose GrowDesk Capture → Set as Name. The Name chip fills in. Text WhatsApp won't let you select, like the name in Contact info, works the same way; to take part of a message, highlight that part first.",
+    text: "Select the name in the chat, right-click, then choose GrowDesk Capture → Set as Name. The Name chip fills in.",
     Scene: NameScene,
   },
   {
     title: "Highlight the number",
     text: "Do the same with the number: Set as WhatsApp Number. Any format works; GrowDesk adds the country code.",
     Scene: NumberScene,
+  },
+  {
+    title: "Can't highlight? Draw a box",
+    text: "Some text can't be highlighted, like the name and number in WhatsApp's Contact info. Press Draw on the bar, drag a box around it, then choose Set as Name. Or click a field and choose Draw a box around it.",
+    Scene: DrawScene,
   },
   {
     title: "Pick from the lists",

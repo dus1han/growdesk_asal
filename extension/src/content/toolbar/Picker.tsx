@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fieldKind, hasValue, optionsFor, type FieldValue } from '../../types/capture';
 import type { ConfigBundle, ConfigField } from '../../types/growdesk';
-import { CheckIcon } from './icons';
+import { CheckIcon, DrawIcon } from './icons';
 
 export interface PickerProps {
   field: ConfigField;
@@ -12,6 +12,8 @@ export interface PickerProps {
   anchorEl: HTMLElement;
   onChange: (value: FieldValue | null) => void;
   onClose: () => void;
+  /** Draw a box around text on the page to capture it into this field. */
+  onDraw: () => void;
 }
 
 const WIDTH = 260;
@@ -21,7 +23,7 @@ const SEARCH_FROM = 8;
  * The small panel under a chip: a list to pick from, a date, yes/no, or, for highlighted text,
  * the captured value with a way to remove it.
  */
-export function Picker({ field, bundle, value, anchor, anchorEl, onChange, onClose }: PickerProps) {
+export function Picker({ field, bundle, value, anchor, anchorEl, onChange, onClose, onDraw }: PickerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const kind = fieldKind(field);
 
@@ -59,7 +61,7 @@ export function Picker({ field, bundle, value, anchor, anchorEl, onChange, onClo
       ) : kind === 'boolean' ? (
         <YesNo value={value} onChange={onChange} onClose={onClose} />
       ) : (
-        <Highlighted field={field} value={value} onChange={onChange} onClose={onClose} />
+        <Highlighted field={field} value={value} onChange={onChange} onClose={onClose} onDraw={onDraw} />
       )}
     </div>
   );
@@ -194,20 +196,26 @@ function Highlighted({
   value,
   onChange,
   onClose,
+  onDraw,
 }: {
   field: ConfigField;
   value: FieldValue | undefined;
   onChange: (v: FieldValue | null) => void;
   onClose: () => void;
+  onDraw: () => void;
 }) {
   const verb = field.type === 'textarea' ? `Add to ${field.label}` : `Set as ${field.label}`;
   return (
     <>
       <div className="gd-pop-body">
         {hasValue(value) && <div className="gd-pop-value">{String(value)}</div>}
+        <button type="button" className="gd-draw-btn" autoFocus={!hasValue(value)} onClick={onDraw}>
+          <DrawIcon />
+          Draw a box around it
+        </button>
         <p className="gd-pop-hint">
-          {hasValue(value) ? 'To change it, right-click' : 'Right-click'} the text on the page, then choose{' '}
-          <strong>GrowDesk Capture → {verb}</strong>. To take part of a longer message, highlight that part first.
+          For text that can&apos;t be highlighted, like the name in Contact info. Or highlight the text, right-click and choose{' '}
+          <strong>GrowDesk Capture → {verb}</strong>.
         </p>
       </div>
       {hasValue(value) && (

@@ -33,4 +33,5 @@ export const CaretIcon = icon('m6 9 6 6 6-6', 2.2);
 export const CloseIcon = icon('M18 6 6 18M6 6l12 12', 2.2);
 export const PlayIcon = icon('M7 5v14l11-7z', 2.2);
 export const SendIcon = icon('M5 12h14M13 6l6 6-6 6', 2.4);
+export const DrawIcon = icon('M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M9 12h6', 2);
 export const HelpIcon = icon('M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5M12 18h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z', 2);

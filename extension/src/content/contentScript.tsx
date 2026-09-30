@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
-import { displayValue, enabledFields, saveBlocker, type CaptureSession, type FieldValue, type Platform } from '../types/capture';
+import { displayValue, enabledFields, fieldKind, saveBlocker, type CaptureSession, type FieldValue, type Platform } from '../types/capture';
 import type { ConfigBundle } from '../types/growdesk';
 import type { ContentMessage, SaveResponse, StateResponse } from '../types/messages';
-import { isClickedTextRequest, isStatePush, type ClickedTextResponse } from '../types/messages';
-import { pickedText } from '../utils/pageText';
+import { isStatePush } from '../types/messages';
 import { detectPlatform } from '../utils/platform';
 import { applyPageOffset, OFFSET_CLASS, removePageOffset, TOOLBAR_HEIGHT } from './pageOffset';
+import type { ConfigField } from '../types/growdesk';
+import { mergeHighlight, normalizeSelection } from '../utils/normalize';
+import { BoxPicker } from './toolbar/BoxPicker';
 import { SavedCard, type SavedLead } from './toolbar/SavedCard';
 import { Toolbar, type StatusMessage } from './toolbar/Toolbar';
 import toolbarCss from './toolbar/toolbar.css?inline';
@@ -43,6 +45,8 @@ function App({ platform }: { platform: Platform }) {
   const [errorField, setErrorField] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<SavedLead | null>(null);
+  /** "Draw a box" in progress: for a field chosen from its chip, or choose after (null). */
+  const [drawing, setDrawing] = useState<{ key: string | null } | null>(null);
   const timer = useRef<number | null>(null);
 
   /** Confirmations fade; errors and warnings stay until the next action, so they can't be missed. */
@@ -168,8 +172,38 @@ function App({ platform }: { platform: Platform }) {
     [apply, errorField, show],
   );
 
+  const textFields = enabledFields(bundle).filter((f) => fieldKind(f) === 'highlight');
+
+  const captureDrawn = async (field: ConfigField, text: string) => {
+    setDrawing(null);
+    const value = normalizeSelection(field, text);
+    const next = mergeHighlight(field, session?.values[field.key], value);
+    const r = await send({ type: 'GD_SET_VALUE', key: field.key, value: next });
+    if (!r.ok) {
+      show(r.error ?? 'Could not keep that value.', 'error');
+      return;
+    }
+    apply(r);
+    if (errorField === field.key) setErrorField(null);
+    show(`${field.label}: ${value}`, 'success');
+  };
+
   return (
     <>
+      {drawing && (
+        <div className="gd">
+          <BoxPicker
+            field={drawing.key ? (textFields.find((f) => f.key === drawing.key) ?? null) : null}
+            fields={textFields}
+            skip={document.getElementById(HOST_ID)}
+            onCapture={(f, t) => void captureDrawn(f, t)}
+            onCancel={(message) => {
+              setDrawing(null);
+              if (message) show(message, 'error');
+            }}
+          />
+        </div>
+      )}
       <Toolbar
         session={session}
         bundle={bundle}
@@ -184,6 +218,7 @@ function App({ platform }: { platform: Platform }) {
         onSetValue={(k, v) => void handleSetValue(k, v)}
         onOpenSettings={() => void send({ type: 'GD_OPEN_SETTINGS' })}
         onOpenGuide={() => void send({ type: 'GD_OPEN_GUIDE' })}
+        onDraw={(key) => setDrawing({ key })}
       />
       {saved && (
         <div className="gd">
@@ -193,25 +228,6 @@ function App({ platform }: { platform: Platform }) {
     </>
   );
 }
-
-/**
- * The element last right-clicked, so "GrowDesk Capture → Set as …" can capture text that can't be
- * selected. Only the element the user right-clicks is read, and only when they pick a menu item.
- */
-let lastRightClicked: Element | null = null;
-window.addEventListener(
-  'contextmenu',
-  (e) => {
-    const target = e.composedPath()[0];
-    lastRightClicked = target instanceof Element ? target : null;
-  },
-  true,
-);
-chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
-  if (!isClickedTextRequest(message)) return false;
-  sendResponse(pickedText(lastRightClicked as HTMLElement | null) satisfies ClickedTextResponse);
-  return false;
-});
 
 /** What the "Saved in GrowDesk" card shows, from the capture that was just sent. */
 function savedLead(session: CaptureSession, bundle: ConfigBundle, r: SaveResponse): SavedLead {

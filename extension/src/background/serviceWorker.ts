@@ -1,6 +1,6 @@
 import { buildRequest, createSession, enabledFields, saveBlocker, type CaptureSession, type Platform } from '../types/capture';
 import type { ConfigBundle } from '../types/growdesk';
-import type { ClickedTextRequest, ClickedTextResponse, ContentMessage, SaveResponse, StatePushMessage, StateResponse } from '../types/messages';
+import type { ContentMessage, SaveResponse, StatePushMessage, StateResponse } from '../types/messages';
 import { clearSession, isTabCapturing, readSession, writeSession } from '../storage/captureSession';
 import { guideUrl, isConfigured, readSettings } from '../storage/settings';
 import { cachedBundle, GrowDeskError, loadBundle, sendLead } from '../api/growdesk';
@@ -97,20 +97,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       return;
     }
 
-    // Highlighted text wins; otherwise the text of whatever was right-clicked (for text WhatsApp
-    // won't let you select, such as the name in Contact info).
-    let raw = info.selectionText?.trim() ?? '';
-    if (!raw) {
-      const clicked = await clickedText(tabId, info.frameId);
-      if ('error' in clicked) {
-        await pushState(tabId, session, clicked.error, 'error');
-        return;
-      }
-      raw = clicked.text;
-    }
-    const value = normalizeSelection(field, raw);
+    const value = normalizeSelection(field, info.selectionText ?? '');
     if (!value) {
-      await pushState(tabId, session, 'Nothing there to capture. Right-click right on the text.', 'error');
+      await pushState(tabId, session, 'No text selected. Highlight it first, or use Draw on the bar.', 'error');
       return;
     }
 
@@ -122,18 +111,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     await pushState(tabId, updated, `${field.label}: ${value}`, 'success');
   })();
 });
-
-/** Asks the page for the text of the element that was right-clicked. */
-async function clickedText(tabId: number, frameId?: number): Promise<ClickedTextResponse> {
-  try {
-    const response = (await chrome.tabs.sendMessage(tabId, { type: 'GD_GET_CLICKED_TEXT' } satisfies ClickedTextRequest, { frameId: frameId ?? 0 })) as
-      | ClickedTextResponse
-      | undefined;
-    return response ?? { error: 'Could not read that text. Reload the page and try again.' };
-  } catch {
-    return { error: 'Could not read that text. Reload the page and try again.' };
-  }
-}
 
 /** Request/response channel used by the toolbar. */
 chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendResponse) => {

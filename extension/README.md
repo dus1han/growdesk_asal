@@ -27,10 +27,11 @@ Revoking the connection in GrowDesk stops this PC on its next request.
 ## Capture a lead
 
 1. Open `https://web.whatsapp.com/` or `https://www.instagram.com/` and press **START**.
-2. Right-click the name or number, then **GrowDesk Capture → Set as Name / Set as WhatsApp Number / …**
-   This works on text WhatsApp won't let you select, such as the name and number in Contact info.
-   To take only part of a longer message, highlight that part first. (Notes collect several:
-   **Add to Notes**.)
+2. Highlight a name or number, right-click, then **GrowDesk Capture → Set as Name / Set as WhatsApp
+   Number / …** (Notes collect several: **Add to Notes**.)
+   Text that can't be highlighted, such as the name and number in WhatsApp's Contact info: press
+   **Draw** on the bar and drag a box around it, then choose **Set as …**. Or click the field's chip
+   and choose **Draw a box around it**. Only the words inside the box are taken.
 3. Click a list chip (e.g. **Interested Treatments ▾**) to choose from GrowDesk's lists. Click
    a captured chip to see or remove its value.
 4. Press **STOP**. STOP is available once every required field (red `*`) is filled and there's

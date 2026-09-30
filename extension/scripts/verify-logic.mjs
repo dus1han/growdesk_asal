@@ -27,7 +27,6 @@ const {
   mergeHighlight,
   normalizeSelection,
   platformFromHostname,
-  pickedText,
   isConfigured,
   normalizeServer,
   originPattern,
@@ -124,15 +123,6 @@ check('Server address: bare IP means http, a name means https', () => {
   assert.equal(originPattern('http://169.58.92.105:3110'), 'http://169.58.92.105:3110/*');
   assert.equal(isConfigured({ serverUrl: '169.58.92.105:3110', clientId: 'gdc_1', clientSecret: 'gds_2' }), true);
   assert.equal(isConfigured({ serverUrl: '169.58.92.105:3110', clientId: '', clientSecret: 'gds_2' }), false);
-});
-check('Right-click without selecting: the element text, else its tooltip; big areas refused', () => {
-  const el = (innerText, attrs = {}) => ({ innerText, getAttribute: (n) => attrs[n] ?? null });
-  assert.deepEqual(pickedText(el('Mohamed Jaffar/ IT Support Engineer')), { text: 'Mohamed Jaffar/ IT Support Engineer' });
-  assert.deepEqual(pickedText(el('  +971 56 525\n 9640 ')), { text: '+971 56 525 9640' });
-  assert.deepEqual(pickedText(el('', { title: 'Sarah Fernando' })), { text: 'Sarah Fernando' });
-  assert.ok('error' in pickedText(el('x'.repeat(400))));
-  assert.ok('error' in pickedText(el('')));
-  assert.ok('error' in pickedText(null));
 });
 check('Platform detection', () => {
   assert.equal(platformFromHostname('web.whatsapp.com'), 'WhatsApp');

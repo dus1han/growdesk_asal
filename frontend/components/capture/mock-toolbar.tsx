@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Check, ChevronDown, CircleHelp, Play, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, CircleHelp, Play, Scan, X } from "lucide-react";
 import { LogoMark } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +48,7 @@ export function MockToolbar({
   busy,
   picker,
   pressed,
+  showDraw = true,
 }: {
   capturing: boolean;
   chips: MockChip[];
@@ -58,6 +59,8 @@ export function MockToolbar({
   picker?: MockPicker | null;
   /** data-target of a control shown pressed (the guide's click). */
   pressed?: string | null;
+  /** The "Draw" button (draw a box around text that can't be highlighted). */
+  showDraw?: boolean;
 }) {
   const press = (t: string) => (pressed === t ? "scale-[0.96]" : "");
   return (
@@ -205,6 +208,17 @@ export function MockToolbar({
         </AnimatePresence>
       </span>
 
+      {capturing && showDraw && (
+        <span
+          data-target="draw"
+          className={cn(
+            "inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-[9px] border border-dashed border-brand/55 px-2.5 text-[12.5px] font-semibold text-brand-strong transition-transform duration-150",
+            press("draw"),
+          )}
+        >
+          <Scan className="size-[15px]" /> Draw
+        </span>
+      )}
       <span data-target="help" className={cn("flex size-[30px] shrink-0 items-center justify-center rounded-lg text-muted", press("help"))}>
         <CircleHelp className="size-4" />
       </span>

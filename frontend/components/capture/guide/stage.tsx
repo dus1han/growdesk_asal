@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { cn } from "@/lib/utils";
 
 /** The guide is drawn at a fixed laptop-like size, then scaled to fit, so nothing reflows. */
-export const STAGE_W = 1260;
+export const STAGE_W = 1300;
 export const STAGE_H = 560;
 
 const StageContext = createContext<{ root: React.RefObject<HTMLDivElement | null>; scale: number }>({
