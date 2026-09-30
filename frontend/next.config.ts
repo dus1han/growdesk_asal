@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // The dev badge sits bottom-left, exactly over the sidebar's collapse and sign-out controls.
   devIndicators: false,
+  experimental: {
+    // The _rsc cache-busting check exists to protect CDN caches. GrowDesk has no CDN (Caddy
+    // doesn't cache), and the check's 307 redirect was silently cancelling router.push() to
+    // freshly created pages, e.g. opening a customer right after adding them.
+    validateRSCRequestHeaders: false,
+  },
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
   },

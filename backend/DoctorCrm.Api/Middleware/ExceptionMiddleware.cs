@@ -25,7 +25,7 @@ public class ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddlewa
             // Expected outcome of a rule check: the message is meant for the user.
             context.Response.StatusCode = ex.StatusCode;
             var errors = ex.Field is null ? null : new List<ApiError> { new(ex.Field, ex.Message) };
-            await context.Response.WriteAsJsonAsync(ApiResponse.Fail(ex.Message, errors));
+            await context.Response.WriteAsJsonAsync(new ApiResponse<object>(false, ex.Details, ex.Message, errors ?? []));
         }
         catch (Exception ex)
         {

@@ -116,6 +116,9 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<CustomFieldService>();
 builder.Services.AddScoped<CaptureConfigService>();
 builder.Services.AddScoped<SettingsService>();
+builder.Services.AddSingleton<ContactNormalizer>();
+builder.Services.AddScoped<ClinicClock>();
+builder.Services.AddScoped<CustomerService>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 builder.Services.AddControllers(o => o.Filters.Add<ValidationFilter>())

@@ -10,6 +10,8 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly fieldErrors: ApiFieldError[] = [],
+    /** Extra detail some errors carry, e.g. the existing customer on a duplicate (409). */
+    public readonly data: unknown = null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -58,7 +60,7 @@ async function request<T>(method: Method, path: string, options: RequestOptions 
   if (!response.ok || !envelope?.success) {
     // 5xx messages are already generic from the backend; anything unexpected becomes the fallback.
     const message = envelope?.message ?? FRIENDLY_FALLBACK;
-    throw new ApiError(message, response.status, envelope?.errors ?? []);
+    throw new ApiError(message, response.status, envelope?.errors ?? [], envelope?.data ?? null);
   }
 
   return envelope.data as T;

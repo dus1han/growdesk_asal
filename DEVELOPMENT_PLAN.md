@@ -12,7 +12,8 @@ The CRM is built in **8 milestones**. Each one ends with both apps building, mig
 | --- | --- |
 | 1 — Foundation and login | **Done** (2026-09-30) |
 | 2 — Administration | **Done** (2026-09-30) |
-| 3 — Customers | Next |
+| 3 — Customers | **Done** (2026-09-30) |
+| 4 — Bookings and calendar | Next |
 
 ### Environment as built
 
@@ -144,14 +145,16 @@ Frontend
 **Done when:** every admin list saves, reorders and deactivates; inactive items are hidden from new forms.
 
 ### Milestone 3 — Customers (§12–§15, §50–§52)
-- [ ] Tables: `customers`, `customer_treatments`, `customer_custom_field_values`
-- [ ] Indexes: `whatsapp_number` (**unique**), `stage_id`, `created_at`, `next_followup_date`
-- [ ] Single WhatsApp normaliser (E.164, libphonenumber)
-- [ ] `GET /api/customers`: server-side pagination, debounced search (name / WhatsApp / Instagram), combinable filters
-- [ ] Customer list: filters in the URL (`/customers?stage=interested&treatment=botox`), cards on mobile
-- [ ] Add/edit customer drawer with treatments and custom fields
-- [ ] Customer profile: header, treatment badges, upcoming booking, booking history, activity timeline
-- [ ] Audit log service called from every mutating service method (§42)
+- [x] Tables: `customers`, `customer_treatments`, `customer_custom_field_values`
+- [x] Indexes: `whatsapp_number` (**unique**), `stage_id`, `created_at`, `next_followup_date`
+- [x] Single WhatsApp normaliser (E.164, libphonenumber)
+- [x] `GET /api/customers`: server-side pagination, debounced search (name / WhatsApp / Instagram), combinable filters
+- [x] Customer list: filters in the URL (`/customers?stage=interested&treatment=botox`), cards on mobile
+- [x] Add/edit customer drawer with treatments and custom fields
+- [x] Customer profile: header, treatment badges, upcoming booking, booking history, activity timeline
+- [x] Audit log service called from every mutating service method (§42)
+
+**Notes:** a customer needs a name plus a WhatsApp number or Instagram name (matching the capture toolbar). WhatsApp and Instagram are both normalised and unique when present. Local UAE numbers are accepted (Phone:DefaultRegion = AE).
 
 **Done when:** duplicate WhatsApp numbers are rejected in any format, and filters combine correctly.
 

@@ -11,6 +11,9 @@ public class BusinessRuleException(string message, int statusCode = StatusCodes.
     public int StatusCode { get; } = statusCode;
     public string? Field { get; } = field;
 
+    /// <summary>Optional machine-readable detail returned as the response's data (e.g. the duplicate customer).</summary>
+    public object? Details { get; init; }
+
     public static BusinessRuleException NotFound(string what) => new($"{what} not found.", StatusCodes.Status404NotFound);
 
     public static BusinessRuleException Conflict(string message, string? field = null) =>

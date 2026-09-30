@@ -20,6 +20,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CustomField> CustomFields => Set<CustomField>();
     public DbSet<CustomFieldOption> CustomFieldOptions => Set<CustomFieldOption>();
     public DbSet<CaptureFieldConfiguration> CaptureFieldConfigurations => Set<CaptureFieldConfiguration>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerTreatment> CustomerTreatments => Set<CustomerTreatment>();
+    public DbSet<CustomerCustomFieldValue> CustomerCustomFieldValues => Set<CustomerCustomFieldValue>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -104,6 +107,43 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.FieldKey).HasMaxLength(60).IsRequired();
             e.HasIndex(x => x.FieldKey).IsUnique();
             e.HasOne(x => x.CustomField).WithMany().HasForeignKey(x => x.CustomFieldId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<Customer>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(150).IsRequired();
+            e.Property(x => x.WhatsAppNumber).HasMaxLength(20);
+            e.Property(x => x.SecondaryPhone).HasMaxLength(20);
+            e.Property(x => x.InstagramName).HasMaxLength(30);
+            e.Property(x => x.Email).HasMaxLength(254);
+            e.Property(x => x.Notes).HasMaxLength(4000);
+
+            // Duplicate detection (spec §35): unique when present.
+            e.HasIndex(x => x.WhatsAppNumber).IsUnique().HasFilter("whats_app_number IS NOT NULL");
+            e.HasIndex(x => x.InstagramName).IsUnique().HasFilter("instagram_name IS NOT NULL");
+            e.HasIndex(x => x.StageId);
+            e.HasIndex(x => x.CreatedAt);
+            e.HasIndex(x => x.NextFollowUpDate);
+
+            e.HasOne(x => x.Stage).WithMany().HasForeignKey(x => x.StageId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.LeadSource).WithMany().HasForeignKey(x => x.LeadSourceId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.AssignedUser).WithMany().HasForeignKey(x => x.AssignedUserId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<CustomerTreatment>(e =>
+        {
+            e.HasKey(x => new { x.CustomerId, x.TreatmentId });
+            e.HasOne(x => x.Customer).WithMany(x => x.Treatments).HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Treatment).WithMany().HasForeignKey(x => x.TreatmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.TreatmentId);
+        });
+
+        b.Entity<CustomerCustomFieldValue>(e =>
+        {
+            e.HasKey(x => new { x.CustomerId, x.CustomFieldId });
+            e.Property(x => x.Value).HasMaxLength(4000).IsRequired();
+            e.HasOne(x => x.Customer).WithMany(x => x.CustomFieldValues).HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.CustomField).WithMany().HasForeignKey(x => x.CustomFieldId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<SystemSetting>(e =>
