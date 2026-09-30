@@ -1,145 +1,178 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
-import { canSave, type CaptureSession, type Platform } from '../types/capture';
+import { saveBlocker, type CaptureSession, type FieldValue, type Platform } from '../types/capture';
+import type { ConfigBundle } from '../types/growdesk';
 import type { ContentMessage, SaveResponse, StateResponse } from '../types/messages';
 import { isStatePush } from '../types/messages';
 import { detectPlatform } from '../utils/platform';
-import { downloadTxt } from '../utils/txtExporter';
 import { applyPageOffset, OFFSET_CLASS, removePageOffset, TOOLBAR_HEIGHT } from './pageOffset';
-import { Toolbar, type FlashMessage } from './toolbar/Toolbar';
+import { Toolbar, type StatusMessage } from './toolbar/Toolbar';
 import toolbarCss from './toolbar/toolbar.css?inline';
 
-const HOST_ID = 'crm-capture-toolbar-host';
-const FLASH_MS = 1800;
+const HOST_ID = 'growdesk-capture-toolbar-host';
+const FLASH_MS = 2200;
+/** How often the field setup is re-read while the tab is visible, so admin changes show up. */
+const REFRESH_MS = 60_000;
 
-const UNREACHABLE = 'Extension background unavailable. Reload the page.';
+const UNREACHABLE = 'GrowDesk Capture stopped responding. Reload the page.';
 
 /** Promise wrapper around sendMessage that never rejects into React. */
 async function request<T>(message: ContentMessage, onFailure: (error: string) => T): Promise<T> {
   try {
     const response = (await chrome.runtime.sendMessage(message)) as T | undefined;
-    return response ?? onFailure('No response from background.');
+    return response ?? onFailure('No response from the extension.');
   } catch (error) {
-    console.error('[CRM Capture] Background unreachable.', error);
+    console.error('[GrowDesk Capture] Background unreachable.', error);
     return onFailure(UNREACHABLE);
   }
 }
 
 const send = (message: ContentMessage): Promise<StateResponse> =>
-  request(message, (error) => ({ ok: false, session: null, error }));
+  request(message, (error) => ({ ok: false, session: null, bundle: null, configured: true, error }));
 
-const sendSave = (): Promise<SaveResponse> =>
-  request({ type: 'CRM_SAVE' }, (error) => ({ ok: false, error }));
+const sendSave = (): Promise<SaveResponse> => request({ type: 'GD_SAVE' }, (error) => ({ ok: false, error }));
 
 function App({ platform }: { platform: Platform }) {
   const [session, setSession] = useState<CaptureSession | null>(null);
-  const [flash, setFlash] = useState<FlashMessage | null>(null);
+  const [bundle, setBundle] = useState<ConfigBundle | null>(null);
+  const [configured, setConfigured] = useState(true);
+  const [status, setStatus] = useState<StatusMessage | null>(null);
+  const [errorField, setErrorField] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const flashTimer = useRef<number | null>(null);
+  const timer = useRef<number | null>(null);
 
-  const showFlash = useCallback((text: string, tone: FlashMessage['tone'] = 'success') => {
-    if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
-    flashTimer.current = null;
-    setFlash({ text, tone });
-
-    // Confirmations fade; errors stay put. A vanishing "could not save" is
-    // indistinguishable from a successful save, and with sheet-only saving
-    // that would quietly cost the user the lead.
-    if (tone === 'error') return;
-    flashTimer.current = window.setTimeout(() => {
-      setFlash(null);
-      flashTimer.current = null;
-    }, FLASH_MS);
+  /** Confirmations fade; errors and warnings stay until the next action, so they can't be missed. */
+  const show = useCallback((text: string, tone: StatusMessage['tone'] = 'success') => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+    setStatus({ text, tone });
+    if (tone === 'success') {
+      timer.current = window.setTimeout(() => {
+        setStatus(null);
+        timer.current = null;
+      }, FLASH_MS);
+    }
   }, []);
 
-  // Restore any capture that was already running (page reload, SPA remount).
+  const apply = useCallback((r: StateResponse) => {
+    setSession(r.session);
+    if (r.bundle) setBundle(r.bundle);
+    setConfigured(r.configured);
+  }, []);
+
+  // Re-read the field setup: on load, when the tab comes back into view, and every minute while
+  // it is visible. A change made in GrowDesk (e.g. a newly required field) shows up by itself.
   useEffect(() => {
     let cancelled = false;
-    void send({ type: 'CRM_GET_STATE', platform }).then((response) => {
-      if (!cancelled && response.ok) setSession(response.session);
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      void send({ type: 'GD_REFRESH', platform }).then((r) => !cancelled && apply(r));
+    };
+    void send({ type: 'GD_GET_STATE', platform }).then((r) => {
+      if (cancelled) return;
+      apply(r);
+      refresh();
     });
+    const interval = window.setInterval(refresh, REFRESH_MS);
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
     };
-  }, [platform]);
+  }, [platform, apply]);
 
-  // State pushed by the service worker after a context-menu capture.
+  // State pushed by the service worker after a right-click capture or a new field setup.
   useEffect(() => {
     const listener = (message: unknown) => {
       if (!isStatePush(message)) return;
       setSession(message.session);
-      if (message.flash) showFlash(message.flash, message.flashTone ?? 'success');
+      if (message.bundle) setBundle(message.bundle);
+      if (message.flash) show(message.flash, message.flashTone ?? 'success');
     };
     chrome.runtime.onMessage.addListener(listener);
     return () => chrome.runtime.onMessage.removeListener(listener);
-  }, [showFlash]);
+  }, [show]);
 
-  useEffect(
-    () => () => {
-      if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
-    },
-    [],
-  );
-
-  const showPending = useCallback((text: string) => {
-    if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
-    flashTimer.current = null;
-    setFlash({ text, tone: 'hint' });
+  useEffect(() => () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
   }, []);
 
   const handleStart = useCallback(async () => {
     setBusy(true);
-    const response = await send({ type: 'CRM_START', platform });
+    setErrorField(null);
+    show('Connecting to GrowDesk…', 'pending');
+    const r = await send({ type: 'GD_START', platform });
     setBusy(false);
-    if (!response.ok) {
-      showFlash(response.error ?? 'Could not start capture.', 'error');
+    apply(r);
+    if (!r.ok) {
+      show(r.error ?? 'Could not start capturing.', 'error');
       return;
     }
-    setSession(response.session);
-    showFlash('Capture started — highlight text, then right-click.', 'success');
-  }, [platform, showFlash]);
+    show('Capturing: highlight text, right-click, then choose GrowDesk Capture.', 'success');
+  }, [platform, apply, show]);
 
   const handleStop = useCallback(async () => {
-    // Re-validated here too, so a programmatic trigger can never save.
-    if (!session || !canSave(session)) {
-      showFlash('Capture a Number or Insta Name before saving.', 'error');
+    const blocker = saveBlocker(session, bundle);
+    if (blocker) {
+      show(blocker, 'error');
       return;
     }
-
     setBusy(true);
-    showPending('Sending to CRM…');
-    const response = await sendSave();
-
-    // The worker builds the optional TXT copy; only the page can download it.
-    if (response.txt) {
-      try {
-        downloadTxt(response.txt.filename, response.txt.contents);
-      } catch (error) {
-        console.error('[CRM Capture] TXT download failed.', error);
-      }
-    }
-
+    show('Saving to GrowDesk…', 'pending');
+    const r = await sendSave();
     setBusy(false);
 
-    if (!response.ok) {
-      // Session is deliberately kept so STOP can simply be pressed again.
-      showFlash(response.error ?? 'Could not send to the CRM. Press STOP to retry.', 'error');
+    if (!r.ok) {
+      // The session is kept, so STOP can simply be pressed again once it's fixed.
+      setErrorField(r.field ?? null);
+      const fresh = await send({ type: 'GD_GET_STATE', platform });
+      apply(fresh);
+      show(r.error ?? 'Could not save to GrowDesk. Press STOP to try again.', 'error');
       return;
     }
 
     setSession(null);
-    showFlash('✓ Lead sent to CRM');
-  }, [session, showFlash, showPending]);
+    setErrorField(null);
+    const text = `✓ ${r.message ?? 'Saved to GrowDesk.'}`;
+    if (r.warnings?.length) show(`${text} ${r.warnings.join(' ')}`, 'warning');
+    else show(text, 'success');
+  }, [session, bundle, platform, apply, show]);
+
+  const handleDiscard = useCallback(async () => {
+    const r = await send({ type: 'GD_DISCARD' });
+    apply(r);
+    setErrorField(null);
+    show('Capture discarded.', 'success');
+  }, [apply, show]);
+
+  const handleSetValue = useCallback(
+    async (key: string, value: FieldValue | null) => {
+      if (errorField === key) setErrorField(null);
+      const r = await send({ type: 'GD_SET_VALUE', key, value });
+      if (r.ok) apply(r);
+      else show(r.error ?? 'Could not keep that value.', 'error');
+    },
+    [apply, errorField, show],
+  );
 
   return (
     <Toolbar
       session={session}
+      bundle={bundle}
+      configured={configured}
       platform={platform}
-      flash={flash}
+      status={status}
       busy={busy}
+      errorField={errorField}
       onStart={() => void handleStart()}
       onStop={() => void handleStop()}
+      onDiscard={() => void handleDiscard()}
+      onSetValue={(k, v) => void handleSetValue(k, v)}
+      onOpenSettings={() => void send({ type: 'GD_OPEN_SETTINGS' })}
     />
   );
 }
@@ -148,7 +181,7 @@ function App({ platform }: { platform: Platform }) {
 function createHost(): HTMLDivElement {
   const host = document.createElement('div');
   host.id = HOST_ID;
-  host.setAttribute('data-crm-capture', 'toolbar');
+  host.setAttribute('data-growdesk-capture', 'toolbar');
   // Inline styles keep the host itself immune to page stylesheets.
   host.style.cssText = [
     'position:fixed',
@@ -170,9 +203,9 @@ function createHost(): HTMLDivElement {
 let observer: MutationObserver | null = null;
 
 /**
- * WhatsApp and Instagram rewrite large parts of the DOM as you navigate. This
- * watches only the direct children of <html> - it never reads page content -
- * and re-attaches the single toolbar host if the site detaches it.
+ * WhatsApp and Instagram rewrite large parts of the DOM as you navigate. This watches only the
+ * direct children of <html> - it never reads page content - and re-attaches the single toolbar
+ * host if the site detaches it.
  */
 function keepMounted(host: HTMLElement, platform: Platform): void {
   observer?.disconnect();
@@ -183,7 +216,6 @@ function keepMounted(host: HTMLElement, platform: Platform): void {
     scheduled = true;
     requestAnimationFrame(() => {
       scheduled = false;
-      // Drop any accidental duplicate before re-checking our own host.
       document.querySelectorAll('#' + HOST_ID).forEach((node) => {
         if (node !== host) node.remove();
       });
@@ -200,7 +232,7 @@ function mount(): void {
 
   const platform = detectPlatform();
   if (!platform) {
-    console.warn('[CRM Capture] Unsupported page - toolbar not injected.');
+    console.warn('[GrowDesk Capture] Unsupported page - toolbar not injected.');
     return;
   }
 
@@ -222,7 +254,7 @@ function mount(): void {
     root = createRoot(mountPoint);
     root.render(<App platform={platform} />);
   } catch (error) {
-    console.error('[CRM Capture] Failed to render toolbar.', error);
+    console.error('[GrowDesk Capture] Failed to render toolbar.', error);
     host.remove();
     removePageOffset();
     return;

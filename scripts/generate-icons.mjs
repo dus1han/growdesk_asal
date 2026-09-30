@@ -1,5 +1,5 @@
 // Generates the extension's PNG icons so the repo needs no binary assets.
-// Draws a rounded blue tile with a white check mark, then encodes RGBA -> PNG.
+// Draws the GrowDesk mark (gradient tile, white leaf), then encodes RGBA -> PNG.
 import { deflateSync } from 'node:zlib';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -8,8 +8,6 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = resolve(HERE, '..', 'public', 'icons');
 
-const BG = [26, 109, 214];
-const FG = [255, 255, 255];
 
 const crc32Table = (() => {
   const table = new Uint32Array(256);
@@ -56,7 +54,7 @@ function encodePng(size, rgba) {
   ]);
 }
 
-/** Signed distance from a point to a line segment, used to stroke the check. */
+/** Distance from a point to a line segment, used to stroke the mark. */
 function distanceToSegment(px, py, ax, ay, bx, by) {
   const dx = bx - ax;
   const dy = by - ay;
@@ -67,15 +65,52 @@ function distanceToSegment(px, py, ax, ay, bx, by) {
   return Math.hypot(px - cx, py - cy);
 }
 
+// The GrowDesk mark (CRM components/ui/logo.tsx), in its 40x40 design units: a rising leaf
+// stroke and its stem on a diagonal indigo-to-teal gradient tile.
+const GRADIENT = [
+  [0, [124, 124, 255]],
+  [0.55, [91, 91, 246]],
+  [1, [20, 184, 166]],
+];
+
+function gradientAt(t) {
+  for (let i = 1; i < GRADIENT.length; i += 1) {
+    const [t1, c1] = GRADIENT[i];
+    const [t0, c0] = GRADIENT[i - 1];
+    if (t <= t1) {
+      const k = (t - t0) / (t1 - t0);
+      return c0.map((v, ch) => v + (c1[ch] - v) * k);
+    }
+  }
+  return GRADIENT[GRADIENT.length - 1][1];
+}
+
+function cubic(p0, p1, p2, p3, steps = 24) {
+  const points = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const u = 1 - t;
+    points.push([0, 1].map((k) => u * u * u * p0[k] + 3 * u * u * t * p1[k] + 3 * u * t * t * p2[k] + t * t * t * p3[k]));
+  }
+  return points;
+}
+
+// "M12 27c0-7.5 5.5-13 15-14-0.6 9.4-6.1 15-14 15" and "M13 28l8.5-8.5"
+const LEAF = [...cubic([12, 27], [12, 19.5], [17.5, 14], [27, 13]), ...cubic([27, 13], [26.4, 22.4], [20.9, 28], [13, 28]).slice(1)];
+const STEM = [[13, 28], [21.5, 19.5]];
+
 function drawIcon(size) {
   const rgba = Buffer.alloc(size * size * 4);
-  const radius = size * 0.22;
-  const stroke = Math.max(1.1, size * 0.1);
-  // Check-mark control points, expressed as fractions of the tile.
-  const p = (fx, fy) => [fx * size, fy * size];
-  const [ax, ay] = p(0.28, 0.52);
-  const [bx, by] = p(0.44, 0.68);
-  const [cx, cy] = p(0.74, 0.34);
+  const unit = size / 40;
+  const radius = 11 * unit;
+  // Thicker than the SVG at small sizes, so the mark stays legible in the toolbar.
+  const stroke = Math.max(1.35, 2.6 * unit * (size <= 16 ? 1.35 : size <= 32 ? 1.15 : 1));
+  const segments = [];
+  const addPolyline = (pts) => {
+    for (let i = 1; i < pts.length; i += 1) segments.push([pts[i - 1][0] * unit, pts[i - 1][1] * unit, pts[i][0] * unit, pts[i][1] * unit]);
+  };
+  addPolyline(LEAF);
+  addPolyline(STEM);
 
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
@@ -85,21 +120,17 @@ function drawIcon(size) {
       // Rounded-rectangle coverage.
       const qx = Math.abs(px - size / 2) - (size / 2 - radius);
       const qy = Math.abs(py - size / 2) - (size / 2 - radius);
-      const outside =
-        Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - radius;
+      const outside = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - radius;
       const tileAlpha = Math.min(1, Math.max(0, 0.5 - outside));
       if (tileAlpha <= 0) continue;
 
-      const checkDistance = Math.min(
-        distanceToSegment(px, py, ax, ay, bx, by),
-        distanceToSegment(px, py, bx, by, cx, cy),
-      );
-      const checkAlpha = Math.min(1, Math.max(0, stroke / 2 - checkDistance + 0.5));
+      let distance = Infinity;
+      for (const [ax, ay, bx, by] of segments) distance = Math.min(distance, distanceToSegment(px, py, ax, ay, bx, by));
+      const markAlpha = Math.min(1, Math.max(0, stroke / 2 - distance + 0.5));
 
+      const bg = gradientAt((px + py) / (2 * size));
       const offset = (y * size + x) * 4;
-      for (let ch = 0; ch < 3; ch += 1) {
-        rgba[offset + ch] = Math.round(BG[ch] + (FG[ch] - BG[ch]) * checkAlpha);
-      }
+      for (let ch = 0; ch < 3; ch += 1) rgba[offset + ch] = Math.round(bg[ch] + (255 - bg[ch]) * markAlpha);
       rgba[offset + 3] = Math.round(tileAlpha * 255);
     }
   }

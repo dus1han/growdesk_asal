@@ -1,12 +1,12 @@
-import type { CaptureField } from '../types/capture';
+import type { ConfigField } from '../types/growdesk';
 
 /**
- * Light normalisation only — this prototype deliberately keeps whatever the
- * user highlighted rather than trying to parse numbers or usernames.
+ * Light tidying of highlighted text. GrowDesk does the real normalisation (country codes,
+ * Instagram handles), so this only removes what a selection drags along with it.
  */
-export function normalizeSelection(field: CaptureField, raw: string): string {
+export function normalizeSelection(field: Pick<ConfigField, 'key' | 'type'>, raw: string): string {
   const text = raw.replace(/\s+/g, ' ').trim();
-  if (field !== 'instagramName') return text;
+  if (field.key !== 'instagram') return text;
 
   // Accept "@handle", "handle" and "instagram.com/handle" without over-parsing.
   const fromUrl = text.match(/(?:^|\/\/)(?:www\.)?instagram\.com\/([^/?#\s]+)/i);
@@ -14,9 +14,10 @@ export function normalizeSelection(field: CaptureField, raw: string): string {
   return text;
 }
 
-/** Human-readable label used in toolbar flash messages. */
-export const FIELD_LABEL: Record<CaptureField, string> = {
-  name: 'Name',
-  number: 'Number',
-  instagramName: 'Insta Name',
-};
+/** Notes collect several highlights; every other field takes the latest one. */
+export function mergeHighlight(field: Pick<ConfigField, 'type'>, previous: unknown, next: string): string {
+  if (field.type === 'textarea' && typeof previous === 'string' && previous.trim() && !previous.includes(next)) {
+    return `${previous}\n${next}`;
+  }
+  return next;
+}

@@ -1,101 +1,184 @@
-import { canSave, type CaptureSession, type Platform } from '../../types/capture';
+import { useCallback, useRef, useState } from 'react';
+import { displayValue, enabledFields, fieldKind, hasValue, saveBlocker, type CaptureSession, type FieldValue, type Platform } from '../../types/capture';
+import type { ConfigBundle, ConfigField } from '../../types/growdesk';
+import { CaretIcon, CheckIcon, CloseIcon, LogoMark, PlayIcon, SendIcon } from './icons';
+import { Picker } from './Picker';
 
-export interface FlashMessage {
+export interface StatusMessage {
   text: string;
-  tone: 'success' | 'error' | 'hint';
+  tone: 'success' | 'error' | 'warning' | 'hint' | 'pending';
 }
 
 export interface ToolbarProps {
   session: CaptureSession | null;
+  bundle: ConfigBundle | null;
+  configured: boolean;
   platform: Platform;
-  flash: FlashMessage | null;
+  status: StatusMessage | null;
   busy: boolean;
+  /** The field GrowDesk last rejected, highlighted until it changes. */
+  errorField: string | null;
   onStart: () => void;
   onStop: () => void;
+  onDiscard: () => void;
+  onSetValue: (key: string, value: FieldValue | null) => void;
+  onOpenSettings: () => void;
 }
 
-interface FieldProps {
-  label: string;
-  value?: string;
-}
+/**
+ * The GrowDesk Capture bar, pinned to the top of WhatsApp Web and Instagram. Before START it
+ * shows the fields GrowDesk asks for; while capturing, each chip fills in as values arrive, and
+ * list fields open a picker.
+ */
+export function Toolbar(props: ToolbarProps) {
+  const { session, bundle, configured, platform, status, busy, errorField } = props;
+  const active = Boolean(session?.active);
+  const fields = enabledFields(bundle);
+  const blocker = active ? saveBlocker(session, bundle) : null;
+  const [open, setOpen] = useState<{ key: string; el: HTMLElement } | null>(null);
+  const close = useCallback(() => setOpen(null), []);
 
-function Field({ label, value }: FieldProps) {
-  const isSet = Boolean(value?.trim());
+  // While capturing, the toolbar keeps saying what is still needed; messages take priority.
+  const shown: StatusMessage | null = status ?? (active && blocker ? { text: blocker, tone: 'hint' } : null);
+  const openField = open && bundle ? fields.find((f) => f.key === open.key) : undefined;
+
   return (
-    <span
-      className={`crm-field${isSet ? ' crm-field--set' : ''}`}
-      title={isSet ? `${label}: ${value}` : `${label} not captured`}
-    >
-      <span className="crm-mark" aria-hidden="true">
-        {isSet ? '\u2713' : '\u25CB'}
-      </span>
-      {label}
-      {isSet ? <span className="crm-value">{value}</span> : null}
-    </span>
+    <div className="gd">
+      <div className={`gd-bar${active ? ' gd-bar--active' : ''}`} role="toolbar" aria-label="GrowDesk Capture">
+        <button type="button" className="gd-brand" onClick={props.onOpenSettings} title="GrowDesk Capture settings">
+          <LogoMark />
+          <span className="gd-brand-name">GrowDesk</span>
+          <span className="gd-brand-sub">Capture</span>
+        </button>
+        <span className="gd-divider" aria-hidden="true" />
+
+        {active ? (
+          <span className="gd-state gd-state--active">
+            <span className="gd-pulse" aria-hidden="true" />
+            Capturing
+          </span>
+        ) : (
+          <span className="gd-state">{platform}</span>
+        )}
+
+        {fields.length > 0 && (
+          <>
+            <span className="gd-divider" aria-hidden="true" />
+            <span className="gd-fields">
+              {fields.map((f) => (
+                <Chip
+                  key={f.key}
+                  field={f}
+                  bundle={bundle!}
+                  value={session?.values[f.key]}
+                  active={active}
+                  expanded={open?.key === f.key}
+                  error={errorField === f.key}
+                  onClick={(el) => setOpen((o) => (o?.key === f.key ? null : { key: f.key, el }))}
+                />
+              ))}
+            </span>
+          </>
+        )}
+
+        <span className="gd-divider" aria-hidden="true" />
+        <span className={`gd-status${shown ? ` gd-status--${shown.tone}` : ''}`} role="status" aria-live="polite" title={shown?.text}>
+          {!configured && !status ? (
+            <>
+              Not connected to GrowDesk.{' '}
+              <button type="button" className="gd-link" onClick={props.onOpenSettings}>
+                Connect
+              </button>
+            </>
+          ) : (
+            (shown?.text ?? '')
+          )}
+        </span>
+
+        {active && (
+          <button type="button" className="gd-icon-btn" onClick={props.onDiscard} disabled={busy} title="Discard this capture" aria-label="Discard this capture">
+            <CloseIcon />
+          </button>
+        )}
+        {active ? (
+          <button
+            type="button"
+            className="gd-btn gd-btn--stop"
+            onClick={props.onStop}
+            aria-disabled={Boolean(blocker) || busy}
+            disabled={busy}
+            title={blocker ?? 'Stop and save this lead to GrowDesk'}
+          >
+            {busy ? <span className="gd-spinner" aria-hidden="true" /> : <SendIcon />}
+            STOP
+          </button>
+        ) : (
+          <button type="button" className="gd-btn" onClick={props.onStart} disabled={busy} title="Start capturing a lead">
+            {busy ? <span className="gd-spinner" aria-hidden="true" /> : <PlayIcon />}
+            START
+          </button>
+        )}
+      </div>
+
+      {openField && open && active && bundle && (
+        <Picker
+          field={openField}
+          bundle={bundle}
+          value={session?.values[openField.key]}
+          anchor={open.el.getBoundingClientRect()}
+          anchorEl={open.el}
+          onChange={(v) => props.onSetValue(openField.key, v)}
+          onClose={close}
+        />
+      )}
+    </div>
   );
 }
 
-export function Toolbar({ session, platform, flash, busy, onStart, onStop }: ToolbarProps) {
-  const active = Boolean(session?.active);
-  const saveAllowed = canSave(session);
-
-  // While active but not yet saveable, the toolbar permanently explains why
-  // STOP is unavailable. Transient flash messages take priority over it.
-  const hint = active && !saveAllowed ? 'Capture a Number or Insta Name before saving.' : '';
-  const statusText = flash?.text ?? hint;
-  const statusTone = flash?.tone ?? (hint ? 'hint' : null);
+function Chip({
+  field,
+  bundle,
+  value,
+  active,
+  expanded,
+  error,
+  onClick,
+}: {
+  field: ConfigField;
+  bundle: ConfigBundle;
+  value: FieldValue | undefined;
+  active: boolean;
+  expanded: boolean;
+  error: boolean;
+  onClick: (el: HTMLElement) => void;
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const set = active && hasValue(value);
+  const text = set ? displayValue(field, value, bundle) : '';
+  const picks = fieldKind(field) !== 'highlight';
 
   return (
-    <div className="crm-bar" role="toolbar" aria-label="CRM Capture">
-      <span className="crm-brand">CRM Capture</span>
-      <span className="crm-divider" aria-hidden="true" />
-
-      {active ? (
-        <span className="crm-chip crm-chip--active">
-          <span className="crm-dot" aria-hidden="true" />
-          ACTIVE
+    <button
+      ref={ref}
+      type="button"
+      className={['gd-chip', set && 'gd-chip--set', error && 'gd-chip--error', !active && 'gd-chip--idle'].filter(Boolean).join(' ')}
+      aria-expanded={active ? expanded : undefined}
+      aria-haspopup={active ? 'dialog' : undefined}
+      disabled={!active}
+      title={set ? `${field.label}: ${text}` : `${field.label}${field.required ? ' (required)' : ''}`}
+      onClick={() => ref.current && onClick(ref.current)}
+    >
+      <span className="gd-mark" aria-hidden="true">
+        {set && <CheckIcon />}
+      </span>
+      {field.label}
+      {field.required && !set && <span className="gd-req" aria-hidden="true">*</span>}
+      {set && <span className="gd-value">{text}</span>}
+      {picks && active && (
+        <span className="gd-caret" aria-hidden="true">
+          <CaretIcon />
         </span>
-      ) : (
-        <span className="crm-chip">{platform}</span>
       )}
-
-      <span className="crm-divider" aria-hidden="true" />
-
-      <span className="crm-fields">
-        <Field label="Name" value={session?.name} />
-        <Field label="Number" value={session?.number} />
-        <Field label="Insta" value={session?.instagramName} />
-      </span>
-
-      <span className="crm-divider" aria-hidden="true" />
-
-      <span
-        className={`crm-status${statusTone ? ` crm-status--${statusTone}` : ''}`}
-        role="status"
-        aria-live="polite"
-      >
-        {statusText}
-      </span>
-
-      {active ? (
-        <button
-          type="button"
-          className="crm-btn crm-btn--stop"
-          onClick={onStop}
-          disabled={!saveAllowed || busy}
-          title={
-            saveAllowed
-              ? 'Stop capture and save the TXT file'
-              : 'Capture a Number or Insta Name before saving.'
-          }
-        >
-          STOP
-        </button>
-      ) : (
-        <button type="button" className="crm-btn" onClick={onStart} disabled={busy}>
-          START
-        </button>
-      )}
-    </div>
+    </button>
   );
 }

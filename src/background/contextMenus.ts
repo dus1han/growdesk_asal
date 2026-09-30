@@ -1,85 +1,70 @@
-import type { CaptureField } from '../types/capture';
+import { enabledFields, fieldKind } from '../types/capture';
+import type { ConfigBundle } from '../types/growdesk';
 
-export const ROOT_MENU_ID = 'crm-capture-root';
+/**
+ * The right-click menu: "GrowDesk Capture → Set as <field>" for every field the admin enabled
+ * that is filled by highlighting text. It is rebuilt whenever the field setup changes and only
+ * shown while the focused tab has a capture running.
+ */
 
-export const FIELD_MENU_IDS: Record<string, CaptureField> = {
-  'crm-capture-set-name': 'name',
-  'crm-capture-set-number': 'number',
-  'crm-capture-set-insta': 'instagramName',
-};
+export const ROOT_MENU_ID = 'growdesk-capture-root';
+const FIELD_PREFIX = 'growdesk-set:';
 
-const ALL_MENU_IDS = [ROOT_MENU_ID, ...Object.keys(FIELD_MENU_IDS)];
+const DOCUMENT_URL_PATTERNS = ['https://web.whatsapp.com/*', 'https://www.instagram.com/*'];
 
-const DOCUMENT_URL_PATTERNS = [
-  'https://web.whatsapp.com/*',
-  'https://www.instagram.com/*',
-];
+/** The field key a menu item sets, or null for other items. */
+export const fieldKeyFromMenuId = (id: string | number): string | null =>
+  String(id).startsWith(FIELD_PREFIX) ? String(id).slice(FIELD_PREFIX.length) : null;
 
-let buildPromise: Promise<void> | null = null;
+let menuIds: string[] = [];
+let visible = false;
+let buildChain: Promise<void> = Promise.resolve();
 
 const create = (props: chrome.contextMenus.CreateProperties): Promise<void> =>
   new Promise((resolve) => {
     chrome.contextMenus.create(props, () => {
       // Swallow "duplicate id" style errors so a worker restart is harmless.
-      if (chrome.runtime.lastError) {
-        console.warn('[CRM Capture] Context menu create:', chrome.runtime.lastError.message);
-      }
+      if (chrome.runtime.lastError) console.warn('[GrowDesk Capture] Context menu:', chrome.runtime.lastError.message);
       resolve();
     });
   });
 
-/**
- * Rebuilds the menu tree from scratch. Menus start hidden; they are only
- * revealed while the active tab has a capture running.
- */
-async function buildMenus(): Promise<void> {
+async function build(bundle: ConfigBundle | null): Promise<void> {
   await new Promise<void>((resolve) => chrome.contextMenus.removeAll(() => resolve()));
+  menuIds = [];
 
-  await create({
-    id: ROOT_MENU_ID,
-    title: 'CRM Capture',
-    contexts: ['selection'],
-    documentUrlPatterns: DOCUMENT_URL_PATTERNS,
-    visible: false,
-  });
+  await create({ id: ROOT_MENU_ID, title: 'GrowDesk Capture', contexts: ['selection'], documentUrlPatterns: DOCUMENT_URL_PATTERNS, visible });
+  menuIds.push(ROOT_MENU_ID);
 
-  const titles: Record<CaptureField, string> = {
-    name: 'Set as Name',
-    number: 'Set as Number',
-    instagramName: 'Set as Insta Name',
-  };
-
-  for (const [id, field] of Object.entries(FIELD_MENU_IDS)) {
+  for (const field of enabledFields(bundle).filter((f) => fieldKind(f) === 'highlight')) {
+    const id = FIELD_PREFIX + field.key;
     await create({
       id,
       parentId: ROOT_MENU_ID,
-      title: titles[field],
+      title: field.type === 'textarea' ? `Add to ${field.label}` : `Set as ${field.label}`,
       contexts: ['selection'],
       documentUrlPatterns: DOCUMENT_URL_PATTERNS,
-      visible: false,
+      visible,
     });
+    menuIds.push(id);
   }
 }
 
-/** Builds the menus once per service-worker lifetime. */
-export function ensureMenus(forceRebuild = false): Promise<void> {
-  if (forceRebuild || !buildPromise) {
-    buildPromise = buildMenus().catch((error) => {
-      console.error('[CRM Capture] Failed to build context menus.', error);
-      buildPromise = null;
-    });
-  }
-  return buildPromise;
+/** Rebuilds the menu for a field setup. Calls are queued so two rebuilds never interleave. */
+export function rebuildMenus(bundle: ConfigBundle | null): Promise<void> {
+  buildChain = buildChain.then(() => build(bundle)).catch((error) => console.error('[GrowDesk Capture] Menu build failed.', error));
+  return buildChain;
 }
 
-/** Shows or hides the whole "CRM Capture" submenu. */
-export async function setMenusVisible(visible: boolean): Promise<void> {
-  await ensureMenus();
-  for (const id of ALL_MENU_IDS) {
+/** Shows or hides the whole "GrowDesk Capture" submenu. */
+export async function setMenusVisible(show: boolean): Promise<void> {
+  visible = show;
+  await buildChain;
+  for (const id of menuIds) {
     try {
-      await chrome.contextMenus.update(id, { visible });
+      await chrome.contextMenus.update(id, { visible: show });
     } catch (error) {
-      console.warn(`[CRM Capture] Could not update menu "${id}".`, error);
+      console.warn(`[GrowDesk Capture] Could not update menu "${id}".`, error);
     }
   }
 }

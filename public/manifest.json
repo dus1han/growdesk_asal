@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "CRM Capture (Prototype)",
-  "version": "0.3.0",
-  "description": "Highlight text on WhatsApp Web or Instagram, right-click to capture Name / Number / Insta Name, then STOP to send the lead to your CRM.",
+  "name": "GrowDesk Capture",
+  "version": "1.0.0",
+  "description": "Capture leads from WhatsApp Web and Instagram straight into GrowDesk: highlight, right-click, save.",
   "permissions": [
     "storage",
     "contextMenus"
@@ -34,7 +34,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "CRM Capture (Prototype)",
+    "default_title": "GrowDesk Capture",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -47,7 +47,8 @@
     "open_in_tab": true
   },
   "optional_host_permissions": [
-    "https://*/*"
+    "https://*/*",
+    "http://*/*"
   ],
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAj/f/QaSybxUNgTOSBUH5t64td9+MXHDOCSHhQDA1bUQ0dEJ9uOUVXNeIfQYk1ptmJCUXq/r18kfIqugrMu/Nze85Io08aQQri3jinMiFSyaIRpwzWaRT4z/DnLH6W6uVqPX/+gCaQGzq6Zt/6zCXx1p09qH/khJmZAIJgezJUK3jxZ5TC+mD3cd+LwL7HnBIsFoEs2UX81kGPxcgMtBW7Msw+SHDGPKZwDabkt/yck5OBML3wOXsVcDNta2GHjF8MAvVV3DBZCObfBphePuG9fXwS8nG8axY+boBckPn3J1ajhIYTOK3AvkbcOx1XsZRkfrOuS8fVaEBPO1adKpl2QIDAQAB"
 }

@@ -1,129 +1,107 @@
-# CRM Capture (Prototype)
+# GrowDesk Capture
 
-Chrome Manifest V3 extension that captures lead details from text you highlight
-on **WhatsApp Web** and **Instagram**, and saves them to a local `.txt` file.
+Chrome Manifest V3 extension that captures leads from **WhatsApp Web** and **Instagram**
+straight into **GrowDesk**. A 48px GrowDesk toolbar sits at the top of the page; you highlight
+a name or number, right-click to assign it, pick treatments and other lists on the toolbar,
+and press STOP. GrowDesk adds the customer, or updates them if they already exist.
 
-This is a test/prototype build. It has no backend, no database and no login.
-On STOP it sends one JSON record to an HTTPS endpoint you configure in the
-extension's options page — nothing is sent anywhere until you set one.
+The fields, their order and which are required come from GrowDesk
+(**Administration → Capture Tool**). The toolbar re-reads them when the page loads, when the
+tab comes back into view, every minute while it's visible, and again before saving, so an
+admin change applies without reinstalling or even pressing START again.
 
-## Workflow
+## Connect it (once per PC)
 
-1. Open `https://web.whatsapp.com/` or `https://www.instagram.com/`.
-2. A 48px toolbar appears at the very top of the page and pushes the site down.
-3. Press **START**.
-4. Highlight text, right-click, then choose
-   **CRM Capture → Set as Name / Set as Number / Set as Insta Name**.
-5. The toolbar ticks update and briefly confirm the captured value.
-6. Press **STOP** once a Number **or** an Insta Name exists. STOP means *stop and save*:
-   it downloads `lead-YYYY-MM-DD-HH-mm-ss.txt` and resets the session.
+1. In GrowDesk: **Administration → Capture Tool → Connections → Add connection**. Copy the
+   address, client ID and client secret (the secret is shown once).
+2. Click the GrowDesk Capture icon in Chrome to open its settings. Paste the three values and
+   press **Save & connect**. Chrome asks to allow access to the GrowDesk address; choose Allow.
+3. You'll see *Connected as "Reception PC"*.
 
-### Save rule
+Both `https://` and plain `http://` addresses work. A bare IP such as `169.58.92.105:3110`
+means `http://`. Over `http` the connection is not encrypted, and the settings page says so:
+fine to get started, but move GrowDesk to `https` once it has a domain.
 
-A capture can only be saved when at least one contact identifier exists:
+Revoking the connection in GrowDesk stops this PC on its next request.
 
-| Captured                  | STOP      |
-| ------------------------- | --------- |
-| Name + Number             | enabled   |
-| Name + Insta Name         | enabled   |
-| Number only               | enabled   |
-| Insta Name only           | enabled   |
-| Name only                 | disabled  |
-| Nothing                   | disabled  |
+## Capture a lead
 
-### TXT output
+1. Open `https://web.whatsapp.com/` or `https://www.instagram.com/` and press **START**.
+2. Highlight text, right-click, **GrowDesk Capture → Set as Name / Set as WhatsApp Number / …**
+   (Notes collect several highlights: **Add to Notes**.)
+3. Click a list chip (e.g. **Interested Treatments ▾**) to choose from GrowDesk's lists. Click
+   a captured chip to see or remove its value.
+4. Press **STOP**. STOP is available once every required field (red `*`) is filled and there's
+   a WhatsApp number or an Instagram name.
 
-```
-Name: John Fernando
-Number: +94 77 123 4567
-Instagram Name: @johnfernando
-Source: Instagram
-Captured At: 2026-09-16 09:45:31
-```
+The toolbar shows *"Sarah Fernando was added."* or *"… was updated."*, plus any notes from
+GrowDesk (e.g. a booked customer's stage was kept). If saving fails, nothing is lost: fix what
+the message says and press STOP again. **✕** discards the capture.
 
-Missing fields are written as `Not captured`.
+Lead source is preset to WhatsApp or Instagram when GrowDesk has a source with that name.
 
 ## Build
 
 ```bash
 npm install
-npm run build     # typecheck + logic tests + production build into dist/
+npm run build     # typecheck + logic checks + production build into dist/
 npm run dev       # same build in watch mode
-npm run verify    # capture/validation test cases only
+npm run verify    # logic checks only
 npm run key       # generate key.pem + stable extension ID (run once)
 npm run pack      # signed .crx for distribution
-node scripts/deploy.mjs https://<internal-host>/chrome/crm-capture   # deploy/
 ```
 
-The extension ID is `mnhjjndckpjiglmdlpelboiebdjcfaid`, fixed by `key.pem`.
-Keep that key — losing it changes the ID and invalidates the deployed policy.
+The extension ID is `mnhjjndckpjiglmdlpelboiebdjcfaid`, fixed by `key.pem` (and the `key` in
+the manifest). Keep that key: losing it changes the ID and invalidates the deployed policy.
 
 ## Run it locally (no policy change needed)
 
-On a machine where Chrome policy blocks extensions, use Google's unmanaged
-developer build. It reads no corporate policy key, runs on its own profile, and
-leaves the managed Chrome install untouched.
+On a machine where Chrome policy blocks extensions, use Google's unmanaged developer build:
 
 ```bash
 npm run browser:install   # one-time, downloads Chrome for Testing into .browser/
 npm start                 # builds, launches it with the extension loaded
 ```
 
-Verification helpers, with that browser running:
-
-```bash
-npm run verify:ui       # toolbar is mounted, shadow DOM, sizing, initial state
-npm run verify:layout   # toolbar covers nothing and clips nothing
-npm run verify:e2e      # START -> capture -> STOP -> real TXT download -> reset
-```
-
-## Load in Chrome
-
-> **On a managed machine this may be blocked.** If Chrome policy sets
-> `ExtensionInstallBlocklist = *`, Load Unpacked is refused and Developer mode
-> does not help. See [DEPLOYMENT.md](DEPLOYMENT.md) — deployment goes through
-> `ExtensionInstallForcelist` and internal HTTPS hosting instead.
-
-1. Go to `chrome://extensions`.
-2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked**.
-4. Select the **`dist`** folder in this project.
-5. Open WhatsApp Web or Instagram and reload the tab.
-
-After a rebuild, press the reload icon on the extension card, then reload the site tab.
+Or, where extensions are allowed: `chrome://extensions` → Developer mode → **Load unpacked** →
+the `dist` folder. After a rebuild, press the reload icon on the extension card, then reload
+the site tab.
 
 ## Privacy
 
-Only text you deliberately highlight and assign via the context menu is read.
-The extension does not scrape conversations, read contacts, scan the page, or
-observe messages. The `MutationObserver` watches only the direct children of
-`<html>`, purely to keep its own toolbar attached across SPA navigation.
+Only text you deliberately highlight and assign is read. The extension does not scrape
+conversations, read contacts, scan the page or observe messages. The `MutationObserver`
+watches only the direct children of `<html>`, to keep the toolbar attached across navigation.
 
-Permissions requested: `storage`, `contextMenus`, and host access limited to
-`web.whatsapp.com` and `www.instagram.com`.
+Network access goes to one place: the GrowDesk address you connect, after you allow it in
+Chrome's prompt. Permissions: `storage`, `contextMenus`, host access to `web.whatsapp.com` and
+`www.instagram.com`, and (optional, granted per address) the GrowDesk server.
+
+The client secret is stored in this Chrome profile's extension storage. Tokens last 15 minutes
+and are kept only for the browser session.
 
 ## Project structure
 
 ```
 src/
+  api/growdesk.ts          GrowDesk Capture API client: token, config, send lead
   background/
-    serviceWorker.ts     message router, context-menu clicks, tab lifecycle
-    contextMenus.ts      builds / shows / hides the CRM Capture submenu
+    serviceWorker.ts       message router, right-click handling, save
+    contextMenus.ts        builds "GrowDesk Capture → Set as …" from the field setup
   content/
-    contentScript.tsx    shadow-DOM host, React mount, SPA re-attach, STOP+save
-    pageOffset.ts        pushes page content down by the toolbar height
+    contentScript.tsx      shadow-DOM host, React mount, refresh, START/STOP
+    pageOffset.ts          pushes page content down by the toolbar height
     toolbar/
-      Toolbar.tsx        toolbar UI (ticks, status line, START/STOP)
-      toolbar.css        scoped styles, light + dark
-  storage/
-    captureSession.ts    chrome.storage.session reads/writes, keyed per tab
-  types/
-    capture.ts           CaptureSession model + canSave() rule
-    messages.ts          message contracts between content script and worker
-  utils/
-    platform.ts          hostname -> WhatsApp | Instagram
-    txtExporter.ts       timestamp, filename, TXT body, blob download
-    normalize.ts         minimal trimming / Insta handle tidy-up
-public/manifest.json     MV3 manifest (copied to dist/)
-scripts/                 build, icon generation, logic tests
+      Toolbar.tsx          the bar: brand, state, field chips, status, buttons
+      Picker.tsx           list / date / yes-no picker under a chip
+      icons.tsx            GrowDesk mark and small icons
+      toolbar.css          scoped styles, light + dark
+  options/options.ts       settings page (public/options.html)
+  storage/                 settings (chrome.storage.local), per-tab session (session storage)
+  types/                   capture model + rules, GrowDesk API shapes, messages
+  utils/                   platform detection, highlight tidying
+public/manifest.json       MV3 manifest (copied to dist/)
+scripts/                   build, icon drawing, logic checks, packing
 ```
+
+GrowDesk's API is documented in the GrowDesk repository: `docs/CAPTURE_API.md`.

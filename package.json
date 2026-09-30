@@ -1,8 +1,8 @@
 {
-  "name": "crm-capture-extension",
-  "version": "0.3.0",
+  "name": "growdesk-capture-extension",
+  "version": "1.0.0",
   "private": true,
-  "description": "Prototype Chrome MV3 extension that captures Name / Number / Instagram Name from highlighted text on WhatsApp Web and Instagram, and pushes each lead to a Google Sheet.",
+  "description": "GrowDesk Capture: Chrome MV3 toolbar that captures leads from WhatsApp Web and Instagram into GrowDesk.",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -15,12 +15,8 @@
     "deploy": "npm run pack && node scripts/deploy.mjs",
     "browser:install": "npx --yes @puppeteer/browsers install chrome@stable --path .browser",
     "start": "npm run build && node scripts/run-chrome.mjs",
-    "verify:ui": "node scripts/verify-toolbar.mjs",
-    "verify:layout": "node scripts/verify-layout.mjs",
-    "verify:e2e": "node scripts/verify-e2e.mjs",
     "serve": "node scripts/serve.mjs",
-    "release": "npm run build && node scripts/release.mjs",
-    "verify:destination": "node scripts/verify-destination.mjs"
+    "release": "npm run build && node scripts/release.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

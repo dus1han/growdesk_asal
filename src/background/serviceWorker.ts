@@ -1,91 +1,80 @@
-import { createSession, type CaptureSession, type Platform } from '../types/capture';
-import type {
-  ContentMessage,
-  SaveResponse,
-  StatePushMessage,
-  StateResponse,
-} from '../types/messages';
-import {
-  clearSession,
-  isTabCapturing,
-  readSession,
-  writeSession,
-} from '../storage/captureSession';
-import { ensureMenus, FIELD_MENU_IDS, setMenusVisible } from './contextMenus';
-import { FIELD_LABEL, normalizeSelection } from '../utils/normalize';
-import { platformFromUrl } from '../utils/platform';
+import { buildRequest, createSession, enabledFields, saveBlocker, type CaptureSession, type Platform } from '../types/capture';
+import type { ConfigBundle } from '../types/growdesk';
+import type { ContentMessage, SaveResponse, StatePushMessage, StateResponse } from '../types/messages';
+import { clearSession, isTabCapturing, readSession, writeSession } from '../storage/captureSession';
 import { isConfigured, readSettings } from '../storage/settings';
-import { buildLead } from '../types/lead';
-import { pushToDestination } from '../utils/push';
-import { buildFilename, buildTxt } from '../utils/txtExporter';
-import { canSave } from '../types/capture';
+import { cachedBundle, GrowDeskError, loadBundle, sendLead } from '../api/growdesk';
+import { fieldKeyFromMenuId, rebuildMenus, setMenusVisible } from './contextMenus';
+import { mergeHighlight, normalizeSelection } from '../utils/normalize';
+import { platformFromUrl } from '../utils/platform';
+
+const BUNDLE_KEY = 'growdesk-capture-config';
 
 /** Pushes state (and an optional flash message) down to one tab's toolbar. */
-async function pushState(
-  tabId: number,
-  session: CaptureSession | null,
-  flash?: string,
-  flashTone: StatePushMessage['flashTone'] = 'success',
-): Promise<void> {
-  const message: StatePushMessage = { type: 'CRM_STATE', session, flash, flashTone };
+async function pushState(tabId: number, session: CaptureSession | null, flash?: string, flashTone: StatePushMessage['flashTone'] = 'success'): Promise<void> {
+  const message: StatePushMessage = { type: 'GD_STATE', session, bundle: await cachedBundle(), flash, flashTone };
   try {
     await chrome.tabs.sendMessage(tabId, message);
   } catch {
-    // The content script may not be injected yet (or the tab is gone).
-    // It re-requests state on mount, so dropping this push is safe.
+    // The content script may not be injected yet (or the tab is gone). It re-requests state on
+    // mount, so dropping this push is safe.
   }
 }
 
-/** Keeps global menu visibility in step with the currently focused tab. */
+/** Keeps the global menu visibility in step with the currently focused tab. */
 async function syncMenusForActiveTab(): Promise<void> {
   try {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     const capturing = tab?.id != null && (await isTabCapturing(tab.id));
     await setMenusVisible(Boolean(capturing));
   } catch (error) {
-    console.error('[CRM Capture] Failed to sync context menus.', error);
+    console.error('[GrowDesk Capture] Failed to sync context menus.', error);
     await setMenusVisible(false);
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  void ensureMenus(true).then(syncMenusForActiveTab);
+async function restoreMenus(): Promise<void> {
+  await rebuildMenus(await cachedBundle());
+  await syncMenusForActiveTab();
+}
+
+chrome.runtime.onInstalled.addListener((details) => {
+  void restoreMenus();
+  // First install: nothing works until GrowDesk is connected, so open the settings.
+  if (details.reason === 'install') chrome.runtime.openOptionsPage();
+});
+chrome.runtime.onStartup.addListener(() => void restoreMenus());
+chrome.tabs.onActivated.addListener(() => void syncMenusForActiveTab());
+chrome.windows.onFocusChanged.addListener(() => void syncMenusForActiveTab());
+chrome.tabs.onRemoved.addListener((tabId) => void clearSession(tabId));
+
+// A new field setup (fetched on START or by the settings page) changes the right-click menu.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && BUNDLE_KEY in changes) {
+    void rebuildMenus((changes[BUNDLE_KEY].newValue as ConfigBundle | undefined) ?? null).then(syncMenusForActiveTab);
+  }
 });
 
-chrome.runtime.onStartup.addListener(() => {
-  void ensureMenus(true).then(syncMenusForActiveTab);
-});
+// The toolbar icon has no popup: a click opens the settings.
+chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
 
-chrome.tabs.onActivated.addListener(() => {
-  void syncMenusForActiveTab();
-});
-
-chrome.windows.onFocusChanged.addListener(() => {
-  void syncMenusForActiveTab();
-});
-
-chrome.tabs.onRemoved.addListener((tabId) => {
-  void clearSession(tabId);
-});
-
-// The toolbar icon has no popup, so a click opens the settings page.
-chrome.action.onClicked.addListener(() => {
-  chrome.runtime.openOptionsPage();
-});
-
-/** Handles a right-click on "Set as Name / Number / Insta Name". */
+/** A right-click on "GrowDesk Capture → Set as …". */
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  const field = FIELD_MENU_IDS[String(info.menuItemId)];
+  const key = fieldKeyFromMenuId(info.menuItemId);
   const tabId = tab?.id;
-  if (!field || tabId == null) return;
+  if (!key || tabId == null) return;
 
   void (async () => {
     const session = await readSession(tabId);
     if (!session?.active) {
-      // Menus are global; re-sync rather than blanket-hide so a capture
-      // running in another window is not affected.
       await syncMenusForActiveTab();
-      await pushState(tabId, session, 'Capture is not active. Press START first.', 'error');
+      await pushState(tabId, session, 'Capture is not running. Press START first.', 'error');
+      return;
+    }
+
+    const field = enabledFields(await cachedBundle()).find((f) => f.key === key);
+    if (!field) {
+      await pushState(tabId, session, 'That field is no longer used. Press START again to reload the fields.', 'error');
       return;
     }
 
@@ -95,29 +84,35 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       return;
     }
 
-    const updated: CaptureSession = { ...session, [field]: value };
-    const stored = await writeSession(tabId, updated);
-    if (!stored) {
-      await pushState(tabId, session, 'Could not save capture. See console.', 'error');
+    const updated: CaptureSession = { ...session, values: { ...session.values, [key]: mergeHighlight(field, session.values[key], value) } };
+    if (!(await writeSession(tabId, updated))) {
+      await pushState(tabId, session, 'Could not keep that value. Try again.', 'error');
       return;
     }
-
-    await pushState(tabId, updated, `${FIELD_LABEL[field]} captured: ${value}`, 'success');
+    await pushState(tabId, updated, `${field.label}: ${value}`, 'success');
   })();
 });
 
 /** Request/response channel used by the toolbar. */
 chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendResponse) => {
   const tabId = sender.tab?.id;
+  const reply = async (response: Omit<StateResponse, 'configured'> & { configured?: boolean }) =>
+    sendResponse({ configured: isConfigured(await readSettings()), ...response } satisfies StateResponse);
+
+  if (message.type === 'GD_OPEN_SETTINGS') {
+    chrome.runtime.openOptionsPage();
+    sendResponse({ ok: true });
+    return false;
+  }
   if (tabId == null) {
-    sendResponse({ ok: false, session: null, error: 'No tab context.' } satisfies StateResponse);
+    sendResponse({ ok: false, session: null, bundle: null, configured: false, error: 'No tab context.' } satisfies StateResponse);
     return false;
   }
 
   void (async () => {
     try {
       switch (message.type) {
-        case 'CRM_GET_STATE': {
+        case 'GD_GET_STATE': {
           const session = await readSession(tabId);
           if (session?.active) {
             // A tab can be navigated between the two supported sites mid-capture.
@@ -128,62 +123,81 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendRespo
             }
           }
           await syncMenusForActiveTab();
-          sendResponse({ ok: true, session } satisfies StateResponse);
+          await reply({ ok: true, session, bundle: await cachedBundle() });
           return;
         }
 
-        case 'CRM_START': {
+        case 'GD_REFRESH': {
+          const session = await readSession(tabId);
+          let bundle = await cachedBundle();
+          const settings = await readSettings();
+          if (isConfigured(settings)) {
+            try {
+              bundle = await loadBundle();
+            } catch {
+              // Offline or not reachable: keep the setup we have; START and STOP report errors.
+            }
+          }
+          await reply({ ok: true, session, bundle });
+          return;
+        }
+
+        case 'GD_START': {
           const platform = resolvePlatform(message.platform, sender.url);
           if (!platform) {
-            sendResponse({
-              ok: false,
-              session: null,
-              error: 'Unsupported page.',
-            } satisfies StateResponse);
+            await reply({ ok: false, session: null, bundle: null, error: 'Unsupported page.' });
+            return;
+          }
+          // Fresh field setup every capture, so admin changes apply straight away.
+          let bundle: ConfigBundle;
+          try {
+            bundle = await loadBundle();
+          } catch (error) {
+            await reply({ ok: false, session: null, bundle: await cachedBundle(), error: errorText(error) });
             return;
           }
           const session = createSession(platform);
-          const stored = await writeSession(tabId, session);
-          if (!stored) {
-            sendResponse({
-              ok: false,
-              session: null,
-              error: 'Storage unavailable.',
-            } satisfies StateResponse);
+          presetSource(session, bundle, platform);
+          if (!(await writeSession(tabId, session))) {
+            await reply({ ok: false, session: null, bundle, error: 'Browser storage is unavailable.' });
             return;
           }
+          await rebuildMenus(bundle);
           await setMenusVisible(true);
-          sendResponse({ ok: true, session } satisfies StateResponse);
+          await reply({ ok: true, session, bundle });
           return;
         }
 
-        case 'CRM_SAVE': {
+        case 'GD_SET_VALUE': {
+          const session = await readSession(tabId);
+          if (!session?.active) {
+            await reply({ ok: false, session, bundle: await cachedBundle(), error: 'Capture is not running.' });
+            return;
+          }
+          const values = { ...session.values };
+          if (message.value === null) delete values[message.key];
+          else values[message.key] = message.value;
+          const updated = { ...session, values };
+          await writeSession(tabId, updated);
+          await reply({ ok: true, session: updated, bundle: await cachedBundle() });
+          return;
+        }
+
+        case 'GD_SAVE': {
           sendResponse(await saveLead(tabId));
           return;
         }
 
-        case 'CRM_FINISH': {
+        case 'GD_DISCARD': {
           await clearSession(tabId);
           await syncMenusForActiveTab();
-          sendResponse({ ok: true, session: null } satisfies StateResponse);
+          await reply({ ok: true, session: null, bundle: await cachedBundle() });
           return;
-        }
-
-        default: {
-          sendResponse({
-            ok: false,
-            session: null,
-            error: 'Unknown message.',
-          } satisfies StateResponse);
         }
       }
     } catch (error) {
-      console.error('[CRM Capture] Service worker message failed.', error);
-      sendResponse({
-        ok: false,
-        session: null,
-        error: error instanceof Error ? error.message : 'Unexpected error.',
-      } satisfies StateResponse);
+      console.error('[GrowDesk Capture] Service worker message failed.', error);
+      await reply({ ok: false, session: null, bundle: null, error: errorText(error) });
     }
   })();
 
@@ -192,43 +206,47 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendRespo
 });
 
 /**
- * Sends the tab's capture to the configured destination and, only on success,
- * ends the session. A failed push keeps everything so the user can press STOP
- * again - with no local copy by default, saving must never silently discard a
- * lead.
+ * Sends the tab's capture to GrowDesk and, only on success, ends the session. A failed send
+ * keeps everything so the user can fix it and press STOP again: a lead is never silently lost.
  */
 async function saveLead(tabId: number): Promise<SaveResponse> {
   const session = await readSession(tabId);
-  if (!session || !canSave(session)) {
-    return { ok: false, error: 'Capture a Number or Insta Name before saving.' };
-  }
+  // Re-read the setup first: a field the admin has just made required is enforced before sending.
+  const bundle = await loadBundle().catch(() => cachedBundle());
+  const blocker = saveBlocker(session, bundle);
+  if (blocker || !session || !bundle) return { ok: false, error: blocker ?? 'Nothing to save.' };
 
-  const settings = await readSettings();
-  if (!isConfigured(settings)) {
+  try {
+    const result = await sendLead(buildRequest(session, bundle));
+    await clearSession(tabId);
+    await syncMenusForActiveTab();
     return {
-      ok: false,
-      error: 'No CRM endpoint configured. Open the extension options to set it up.',
+      ok: true,
+      action: result.action,
+      message: result.message ?? (result.action === 'created' ? `${result.customerName} was added.` : `${result.customerName} was updated.`),
+      warnings: result.warnings,
     };
+  } catch (error) {
+    // A list changed in GrowDesk since START: refresh it so the fix is one click away.
+    if (error instanceof GrowDeskError && error.status === 400) void loadBundle().catch(() => undefined);
+    return { ok: false, error: errorText(error), field: error instanceof GrowDeskError ? error.field : null };
   }
+}
 
-  const capturedAt = new Date();
-  const lead = buildLead(session, capturedAt, settings.deviceLabel);
-  const result = await pushToDestination(settings, { lead });
+/** Lead source defaults to the platform when GrowDesk has a source with that name. */
+function presetSource(session: CaptureSession, bundle: ConfigBundle, platform: Platform): void {
+  if (!enabledFields(bundle).some((f) => f.key === 'lead_source')) return;
+  const match = bundle.sources.find((s) => s.name.trim().toLowerCase() === platform.toLowerCase());
+  if (match) session.values.lead_source = match.id;
+}
 
-  // The optional TXT is a belt-and-braces copy, produced either way so a
-  // failed push never leaves the user with nothing.
-  const txt = settings.alsoSaveTxt
-    ? { filename: buildFilename(capturedAt), contents: buildTxt(session, capturedAt) }
-    : undefined;
-
-  if (!result.ok) return { ok: false, error: result.error, txt };
-
-  await clearSession(tabId);
-  await syncMenusForActiveTab();
-  return { ok: true, txt };
+function errorText(error: unknown): string {
+  if (error instanceof GrowDeskError) return error.message;
+  console.error('[GrowDesk Capture] Unexpected error.', error);
+  return 'Something went wrong. Please try again.';
 }
 
 function resolvePlatform(claimed: Platform | undefined, senderUrl?: string): Platform | null {
-  // Trust the sender URL Chrome reports over anything the page sent us.
+  // Trust the sender URL Chrome reports over anything the page sent.
   return platformFromUrl(senderUrl) ?? claimed ?? null;
 }

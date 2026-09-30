@@ -1,6 +1,6 @@
 import type { CaptureSession } from '../types/capture';
 
-const KEY_PREFIX = 'crm-capture-session-';
+const KEY_PREFIX = 'growdesk-capture-session-';
 
 const keyFor = (tabId: number): string => `${KEY_PREFIX}${tabId}`;
 
@@ -13,9 +13,11 @@ export async function readSession(tabId: number): Promise<CaptureSession | null>
   try {
     const key = keyFor(tabId);
     const stored = await chrome.storage.session.get(key);
-    return (stored[key] as CaptureSession | undefined) ?? null;
+    const session = stored[key] as CaptureSession | undefined;
+    // Ignore anything not in the current shape (e.g. left over from an older version).
+    return session && typeof session.values === 'object' && session.values !== null ? session : null;
   } catch (error) {
-    console.error('[CRM Capture] Failed to read session from storage.', error);
+    console.error('[GrowDesk Capture] Failed to read session from storage.', error);
     return null;
   }
 }
@@ -25,7 +27,7 @@ export async function writeSession(tabId: number, session: CaptureSession): Prom
     await chrome.storage.session.set({ [keyFor(tabId)]: session });
     return true;
   } catch (error) {
-    console.error('[CRM Capture] Failed to write session to storage.', error);
+    console.error('[GrowDesk Capture] Failed to write session to storage.', error);
     return false;
   }
 }
@@ -34,7 +36,7 @@ export async function clearSession(tabId: number): Promise<void> {
   try {
     await chrome.storage.session.remove(keyFor(tabId));
   } catch (error) {
-    console.error('[CRM Capture] Failed to clear session from storage.', error);
+    console.error('[GrowDesk Capture] Failed to clear session from storage.', error);
   }
 }
 
