@@ -12,7 +12,6 @@ import type {
   Role,
   SaveCustomField,
   SaveLookupItem,
-  SystemSettings,
   UpdateUser,
 } from "@/types/admin";
 
@@ -184,23 +183,5 @@ export function useSaveCaptureFields() {
     mutationFn: (fields: { key: string; isEnabled: boolean; isRequired: boolean }[]) =>
       api.put<CaptureField[]>("/admin/capture-fields", { fields }),
     onSuccess: (data) => qc.setQueryData(["capture-fields"], data),
-  });
-}
-
-// ---- System settings ------------------------------------------------------------------------------
-
-export function useSystemSettings() {
-  return useQuery({ queryKey: ["system-settings"], queryFn: ({ signal }) => api.get<SystemSettings>("/admin/settings", { signal }) });
-}
-
-export function useSaveSystemSettings() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: SystemSettings) => api.put<SystemSettings>("/admin/settings", input),
-    onSuccess: (data) => {
-      qc.setQueryData(["system-settings"], data);
-      // The sidebar and login screen read branding separately.
-      void qc.invalidateQueries({ queryKey: ["settings", "branding"] });
-    },
   });
 }

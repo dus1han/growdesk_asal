@@ -1,9 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { CircleAlert, Lock, MessageCircle, RotateCcw } from "lucide-react";
+import { CircleAlert, Lock, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { CaptureToolbarPreview } from "@/components/admin/capture-toolbar-preview";
 import { fieldTypeMeta } from "@/components/admin/field-types";
 import { SortableList } from "@/components/admin/sortable-list";
 import { PageHeader } from "@/components/layout/page-header";
@@ -50,7 +51,7 @@ export default function CaptureToolPage() {
     <>
       <PageHeader
         title="Capture Tool"
-        description="Choose which fields the WhatsApp capture tool (Chrome) asks for, which are required, and their order."
+        description="Choose which fields the CRM Capture toolbar collects on WhatsApp Web and Instagram, which are required, and their order."
       />
 
       {isPending ? (
@@ -120,7 +121,7 @@ export default function CaptureToolPage() {
             />
           </Card>
 
-          <DesktopPreview fields={fields.filter((f) => f.isEnabled)} />
+          <CaptureToolbarPreview fields={fields.filter((f) => f.isEnabled)} />
         </>
       )}
 
@@ -146,86 +147,5 @@ export default function CaptureToolPage() {
         )}
       </AnimatePresence>
     </>
-  );
-}
-
-/**
- * How the capture tool will look: it runs in Chrome beside WhatsApp Web, so the preview is a
- * desktop browser window with the tool's side panel on the right.
- */
-function DesktopPreview({ fields }: { fields: CaptureField[] }) {
-  return (
-    <section className="mt-6" aria-label="Capture tool preview">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.06em] text-muted">Preview</p>
-      <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card" aria-hidden>
-        {/* Browser chrome */}
-        <div className="flex items-center gap-3 border-b border-line bg-surface-muted/70 px-4 py-2.5">
-          <div className="flex gap-1.5">
-            <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-            <span className="size-2.5 rounded-full bg-[#febc2e]" />
-            <span className="size-2.5 rounded-full bg-[#28c840]" />
-          </div>
-          <div className="flex h-6 flex-1 items-center rounded-md bg-surface px-3 text-[11px] text-muted sm:max-w-sm">web.whatsapp.com</div>
-        </div>
-
-        <div className="flex h-[440px]">
-          {/* WhatsApp Web, greyed out */}
-          <div className="hidden flex-1 bg-[#efeae2] sm:flex">
-            <div className="w-44 shrink-0 space-y-3 border-r border-black/5 bg-white/70 p-3 lg:w-56">
-              {Array.from({ length: 6 }, (_, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="size-7 shrink-0 rounded-full bg-slate-200" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-2 w-3/4 rounded bg-slate-200" />
-                    <div className="h-1.5 w-1/2 rounded bg-slate-100" />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-1 flex-col justify-end gap-2 p-4">
-              <div className="h-7 w-2/5 rounded-lg rounded-tl-none bg-white shadow-sm" />
-              <div className="ml-auto h-7 w-1/3 rounded-lg rounded-tr-none bg-[#d9fdd3] shadow-sm" />
-              <div className="h-10 w-1/2 rounded-lg rounded-tl-none bg-white shadow-sm" />
-              <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500">
-                <MessageCircle className="size-3" /> WhatsApp Web
-              </div>
-            </div>
-          </div>
-
-          {/* Capture tool panel */}
-          <div className="flex w-full flex-col border-l border-line bg-surface sm:w-[300px] sm:shrink-0">
-            <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-              <span className="flex size-6 items-center justify-center rounded-md bg-gradient-to-br from-brand to-accent text-[10px] font-bold text-white">G</span>
-              <p className="text-sm font-semibold">Capture lead</p>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              <motion.ul layout className="space-y-3">
-                <AnimatePresence initial={false}>
-                  {fields.map((f) => (
-                    <motion.li
-                      key={f.key}
-                      layout
-                      initial={{ opacity: 0, scale: 0.97 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.97 }}
-                      transition={{ duration: 0.18 }}
-                    >
-                      <p className="mb-1 text-[11px] font-medium text-foreground/80">
-                        {f.label}
-                        {f.isRequired && <span className="ml-0.5 text-danger">*</span>}
-                      </p>
-                      <div className={cn("rounded-md border border-line bg-surface-muted/60", f.type === "textarea" ? "h-12" : "h-7")} />
-                    </motion.li>
-                  ))}
-                </AnimatePresence>
-              </motion.ul>
-            </div>
-            <div className="border-t border-line p-3">
-              <div className="flex h-8 items-center justify-center rounded-md bg-brand text-xs font-semibold text-white">Save lead</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
   );
 }

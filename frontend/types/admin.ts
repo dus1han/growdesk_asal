@@ -92,11 +92,3 @@ export interface CaptureField {
   isRequired: boolean;
   displayOrder: number;
 }
-
-export interface SystemSettings {
-  crmName: string;
-  tagline: string;
-  logoUrl: string | null;
-  currency: string;
-  timeZone: string;
-}
