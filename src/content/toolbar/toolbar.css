@@ -335,6 +335,7 @@
   transition: background 150ms ease, color 150ms ease;
 }
 .gd-icon-btn:hover { background: var(--gd-surface-muted); color: var(--gd-danger); }
+.gd-icon-btn--help:hover { color: var(--gd-brand-strong); }
 .gd-icon-btn:focus-visible { outline: 2px solid var(--gd-brand); outline-offset: 1px; }
 .gd-icon-btn svg { width: 16px; height: 16px; }
 

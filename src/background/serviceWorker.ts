@@ -2,7 +2,7 @@ import { buildRequest, createSession, enabledFields, saveBlocker, type CaptureSe
 import type { ConfigBundle } from '../types/growdesk';
 import type { ContentMessage, SaveResponse, StatePushMessage, StateResponse } from '../types/messages';
 import { clearSession, isTabCapturing, readSession, writeSession } from '../storage/captureSession';
-import { isConfigured, readSettings } from '../storage/settings';
+import { guideUrl, isConfigured, readSettings } from '../storage/settings';
 import { cachedBundle, GrowDeskError, loadBundle, sendLead } from '../api/growdesk';
 import { fieldKeyFromMenuId, rebuildMenus, setMenusVisible } from './contextMenus';
 import { mergeHighlight, normalizeSelection } from '../utils/normalize';
@@ -101,6 +101,17 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendRespo
 
   if (message.type === 'GD_OPEN_SETTINGS') {
     chrome.runtime.openOptionsPage();
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (message.type === 'GD_OPEN_GUIDE') {
+    // The guide lives in GrowDesk, so it always matches the current version; not connected yet
+    // means there's nowhere to open it from, so show the settings instead.
+    void readSettings().then((s) => {
+      const url = guideUrl(s);
+      if (url) void chrome.tabs.create({ url });
+      else chrome.runtime.openOptionsPage();
+    });
     sendResponse({ ok: true });
     return false;
   }

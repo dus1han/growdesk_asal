@@ -1,6 +1,6 @@
 {
   "name": "growdesk-capture-extension",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "GrowDesk Capture: Chrome MV3 toolbar that captures leads from WhatsApp Web and Instagram into GrowDesk.",
   "type": "module",
@@ -16,7 +16,8 @@
     "browser:install": "npx --yes @puppeteer/browsers install chrome@stable --path .browser",
     "start": "npm run build && node scripts/run-chrome.mjs",
     "serve": "node scripts/serve.mjs",
-    "release": "npm run build && node scripts/release.mjs"
+    "release": "npm run build && node scripts/release.mjs",
+    "publish:growdesk": "npm run pack && node scripts/publish-growdesk.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

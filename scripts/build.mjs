@@ -4,7 +4,7 @@
 // loads both as classic scripts - a shared-chunk ES module build would not run.
 // Each Vite pass therefore emits one self-contained IIFE.
 import { spawn } from 'node:child_process';
-import { cp, rm, mkdir } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -37,6 +37,18 @@ async function copyStatic() {
   await mkdir(DIST, { recursive: true });
   await cp(resolve(ROOT, 'public'), DIST, { recursive: true });
   console.log('[build] copied manifest.json + icons into dist/');
+
+  // Where installed copies look for updates. Defaults to the local test server; a build for
+  // GrowDesk to host sets GROWDESK_UPDATE_URL=https://<growdesk>/capture/update.xml.
+  const updateUrl = process.env.GROWDESK_UPDATE_URL?.trim();
+  if (updateUrl) {
+    const file = resolve(DIST, 'manifest.json');
+    const manifest = JSON.parse(await readFile(file, 'utf8'));
+    manifest.update_url = updateUrl;
+    await writeFile(file, JSON.stringify(manifest, null, 2) + '
+');
+    console.log(`[build] update_url -> ${updateUrl}`);
+  }
 }
 
 async function main() {

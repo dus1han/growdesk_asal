@@ -48,7 +48,8 @@ const server = createServer((req, res) => {
     'Cache-Control': 'no-cache',
   });
   createReadStream(target).pipe(res);
-  console.log(`  200  ${requested}`);
+  // The query shows what Chrome is asking for, e.g. x=id%3D…%26v%3D0.1.0 (installed version).
+  console.log(`  200  ${req.url}`);
 });
 
 server.listen(PORT, '127.0.0.1', () => {

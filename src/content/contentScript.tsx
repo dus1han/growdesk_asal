@@ -173,6 +173,7 @@ function App({ platform }: { platform: Platform }) {
       onDiscard={() => void handleDiscard()}
       onSetValue={(k, v) => void handleSetValue(k, v)}
       onOpenSettings={() => void send({ type: 'GD_OPEN_SETTINGS' })}
+      onOpenGuide={() => void send({ type: 'GD_OPEN_GUIDE' })}
     />
   );
 }

@@ -10,7 +10,9 @@ export type ContentMessage =
   | { type: 'GD_SET_VALUE'; key: string; value: FieldValue | null }
   | { type: 'GD_SAVE' }
   | { type: 'GD_DISCARD' }
-  | { type: 'GD_OPEN_SETTINGS' };
+  | { type: 'GD_OPEN_SETTINGS' }
+  /** Opens GrowDesk's animated "How to use GrowDesk Capture" guide in a new tab. */
+  | { type: 'GD_OPEN_GUIDE' };
 
 /** Reply to state-changing messages. */
 export interface StateResponse {

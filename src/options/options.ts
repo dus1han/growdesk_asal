@@ -1,5 +1,5 @@
 import { GrowDeskError, loadBundle, testConnection } from '../api/growdesk';
-import { normalizeServer, originPattern, readSettings, writeSettings, type Settings } from '../storage/settings';
+import { guideUrl, normalizeServer, originPattern, readSettings, writeSettings, type Settings } from '../storage/settings';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -11,6 +11,15 @@ const saveButton = $<HTMLButtonElement>('save');
 const testButton = $<HTMLButtonElement>('test');
 const status = $<HTMLElement>('status');
 const insecure = $<HTMLElement>('insecure');
+const guideRow = $<HTMLElement>('guide-row');
+const guideLink = $<HTMLAnchorElement>('guide');
+
+/** The guide link appears once there's a GrowDesk address to open it from. */
+function updateGuideLink(settings: Settings): void {
+  const url = guideUrl(settings);
+  guideRow.hidden = !url;
+  if (url) guideLink.href = url;
+}
 
 function setStatus(text: string, kind: 'ok' | 'err' | 'info'): void {
   status.textContent = text;
@@ -51,6 +60,7 @@ async function load(): Promise<void> {
   clientIdInput.value = settings.clientId;
   secretInput.value = settings.clientSecret;
   updateInsecureNote();
+  updateGuideLink(settings);
   if (!settings.serverUrl) setStatus('Not connected yet. Enter the details from GrowDesk and press Save & connect.', 'info');
 }
 
@@ -83,6 +93,7 @@ saveButton.addEventListener('click', () => {
       }
       saveButton.disabled = true;
       const saved = await writeSettings(settings);
+      updateGuideLink(settings);
       if (!saved) {
         saveButton.disabled = false;
         setStatus('Could not save the settings. Please try again.', 'err');

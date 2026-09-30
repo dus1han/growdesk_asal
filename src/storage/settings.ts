@@ -57,5 +57,11 @@ export function normalizeServer(input: string): string | null {
 export const isConfigured = (s: Settings): boolean =>
   normalizeServer(s.serverUrl) !== null && s.clientId.trim() !== '' && s.clientSecret.trim() !== '';
 
+/** GrowDesk's animated guide to using the toolbar, or null until a server is set. */
+export const guideUrl = (s: Settings): string | null => {
+  const server = normalizeServer(s.serverUrl);
+  return server ? `${server}/capture-guide` : null;
+};
+
 /** The host-permission pattern Chrome must grant before the service worker can reach GrowDesk. */
 export const originPattern = (server: string): string => `${server}/*`;

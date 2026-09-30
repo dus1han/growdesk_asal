@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { displayValue, enabledFields, fieldKind, hasValue, saveBlocker, type CaptureSession, type FieldValue, type Platform } from '../../types/capture';
 import type { ConfigBundle, ConfigField } from '../../types/growdesk';
-import { CaretIcon, CheckIcon, CloseIcon, LogoMark, PlayIcon, SendIcon } from './icons';
+import { CaretIcon, CheckIcon, CloseIcon, HelpIcon, LogoMark, PlayIcon, SendIcon } from './icons';
 import { Picker } from './Picker';
 
 export interface StatusMessage {
@@ -23,6 +23,7 @@ export interface ToolbarProps {
   onDiscard: () => void;
   onSetValue: (key: string, value: FieldValue | null) => void;
   onOpenSettings: () => void;
+  onOpenGuide: () => void;
 }
 
 /**
@@ -95,6 +96,9 @@ export function Toolbar(props: ToolbarProps) {
           )}
         </span>
 
+        <button type="button" className="gd-icon-btn gd-icon-btn--help" onClick={props.onOpenGuide} title="How to use GrowDesk Capture" aria-label="How to use GrowDesk Capture">
+          <HelpIcon />
+        </button>
         {active && (
           <button type="button" className="gd-icon-btn" onClick={props.onDiscard} disabled={busy} title="Discard this capture" aria-label="Discard this capture">
             <CloseIcon />
