@@ -1,6 +1,6 @@
 {
   "name": "growdesk-capture-extension",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "private": true,
   "description": "GrowDesk Capture: Chrome MV3 toolbar that captures leads from WhatsApp Web and Instagram into GrowDesk.",
   "type": "module",
