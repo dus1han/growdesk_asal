@@ -3,6 +3,9 @@ import type { ApiEnvelope, ApiFieldError } from "@/types/api";
 /** Dispatched on any 401 so the auth layer can end the session in one place. */
 export const UNAUTHORIZED_EVENT = "growdesk:unauthorized";
 
+/** Dispatched when the API refuses a call until the user changes their password (backend PasswordChangeGate). */
+export const PASSWORD_CHANGE_EVENT = "growdesk:password-change-required";
+
 const FRIENDLY_FALLBACK = "Something went wrong. Please try again.";
 
 export class ApiError extends Error {
@@ -55,6 +58,14 @@ async function request<T>(method: Method, path: string, options: RequestOptions 
 
   if (response.status === 401 && !options.skipUnauthorizedEvent && typeof window !== "undefined") {
     window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  }
+
+  if (
+    response.status === 403 &&
+    envelope?.errors?.some((e) => e.field === "password_change_required") &&
+    typeof window !== "undefined"
+  ) {
+    window.dispatchEvent(new Event(PASSWORD_CHANGE_EVENT));
   }
 
   if (!response.ok || !envelope?.success) {

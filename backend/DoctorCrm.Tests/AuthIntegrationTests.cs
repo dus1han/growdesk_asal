@@ -40,6 +40,19 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public HttpClient CreateCookieClient() =>
         CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+
+    /// <summary>
+    /// Signs in as a user an admin just created and completes the required first-login password
+    /// change, so the client can use the app. The new password is the temporary one plus "-own".
+    /// </summary>
+    public async Task<HttpClient> SignInNewUserAsync(string username, string temporaryPassword)
+    {
+        var client = CreateCookieClient();
+        (await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, temporaryPassword))).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest(temporaryPassword, temporaryPassword + "-own"))).EnsureSuccessStatusCode();
+        return client;
+    }
 }
 
 public class AuthIntegrationTests(ApiFactory factory) : IClassFixture<ApiFactory>

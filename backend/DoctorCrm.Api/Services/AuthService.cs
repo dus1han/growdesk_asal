@@ -52,6 +52,7 @@ public class AuthService(AppDbContext db, TokenService tokens, AuditService audi
                 u.FullName,
                 u.Username,
                 u.Email,
+                u.MustChangePassword,
                 Roles = u.UserRoles.Select(ur => ur.Role.Name).ToList(),
                 Permissions = u.UserRoles
                     .SelectMany(ur => ur.Role.RolePermissions)
@@ -63,11 +64,29 @@ public class AuthService(AppDbContext db, TokenService tokens, AuditService audi
 
         return user is null
             ? null
-            : new CurrentUserDto(user.Id, user.FullName, user.Username, user.Email, user.Roles, user.Permissions.Order().ToList());
+            : new CurrentUserDto(user.Id, user.FullName, user.Username, user.Email, user.Roles, user.Permissions.Order().ToList(), user.MustChangePassword);
     }
 
     /// <summary>Usernames are unique regardless of case: "dev_admin" and "Dev_Admin" are the same account.</summary>
     public static string NormalizeUsername(string username) => username.Trim().ToUpperInvariant();
+
+    /// <summary>
+    /// Changes the signed-in user's password. The current password is always required, so a
+    /// session left open on a shared computer can't be used to take over the account.
+    /// </summary>
+    public async Task ChangePasswordAsync(int userId, ChangePasswordRequest request, CancellationToken ct)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId && u.IsActive, ct)
+            ?? throw BusinessRuleException.NotFound("User");
+
+        if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            throw new BusinessRuleException("Your current password is incorrect.", field: "currentPassword");
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword, workFactor: 12);
+        user.MustChangePassword = false;
+        audit.Record(userId, AuditActions.PasswordChanged, nameof(User), userId);
+        await db.SaveChangesAsync(ct);
+    }
 
     public async Task RecordLogoutAsync(int userId, CancellationToken ct)
     {

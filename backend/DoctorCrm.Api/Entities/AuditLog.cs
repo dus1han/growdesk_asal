@@ -20,4 +20,5 @@ public static class AuditActions
     public const string UserLoggedIn = "User Logged In";
     public const string UserLoginFailed = "User Login Failed";
     public const string UserLoggedOut = "User Logged Out";
+    public const string PasswordChanged = "Password Changed";
 }

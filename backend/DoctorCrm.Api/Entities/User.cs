@@ -18,5 +18,11 @@ public class User : AuditableEntity
     public bool IsActive { get; set; } = true;
     public DateTime? LastLoginAt { get; set; }
 
+    /// <summary>
+    /// Set when an admin creates the account or resets its password; the user must choose their
+    /// own password before using the app. Cleared by a successful password change.
+    /// </summary>
+    public bool MustChangePassword { get; set; }
+
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 }

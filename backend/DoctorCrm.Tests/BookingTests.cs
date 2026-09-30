@@ -268,8 +268,7 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         var username = $"staff_x{Interlocked.Increment(ref _seq)}";
         await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
             new CreateUserRequest("Staff", username, null, roles.Single(r => r.Name == "Staff").Id, "Staff-Pass-1")));
-        var staff = factory.CreateCookieClient();
-        (await staff.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, "Staff-Pass-1"))).EnsureSuccessStatusCode();
+        var staff = await factory.SignInNewUserAsync(username, "Staff-Pass-1");
         using (var workbook = new ClosedXML.Excel.XLWorkbook(await (await staff.GetAsync($"/api/bookings/export?{range}")).Content.ReadAsStreamAsync()))
         {
             var headers = workbook.Worksheet(1).Row(1).CellsUsed().Select(c => c.GetString()).ToList();
@@ -290,8 +289,7 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         var username = $"staff_b{Interlocked.Increment(ref _seq)}";
         await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
             new CreateUserRequest("Staff", username, null, roles.Single(r => r.Name == "Staff").Id, "Staff-Pass-1")));
-        var staff = factory.CreateCookieClient();
-        (await staff.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, "Staff-Pass-1"))).EnsureSuccessStatusCode();
+        var staff = await factory.SignInNewUserAsync(username, "Staff-Pass-1");
 
         Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync($"/api/bookings/{booking.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsJsonAsync("/api/bookings",

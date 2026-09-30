@@ -17,14 +17,18 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
-type Phase = "idle" | "submitting" | "success";
+export type Phase = "idle" | "submitting" | "success";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
 /** Only same-app paths are allowed after login, never an external URL (open-redirect guard). */
 export function safeNextPath(next: string | null) {
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login") ? next : "/dashboard";
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login") && !next.startsWith("/change-password")
+    ? next
+    : "/dashboard";
 }
+
+export const changePasswordPath = (next: string) => `/change-password?next=${encodeURIComponent(next)}`;
 
 export function LoginForm({ next, onSuccess }: { next: string; onSuccess: () => void }) {
   const router = useRouter();
@@ -44,7 +48,12 @@ export function LoginForm({ next, onSuccess }: { next: string; onSuccess: () => 
     setFormError(null);
     setPhase("submitting");
     try {
-      await login.mutateAsync(values);
+      const session = await login.mutateAsync(values);
+      if (session.user.mustChangePassword) {
+        // Temporary password: choose their own before entering the app (same screen, next step).
+        router.replace(changePasswordPath(next));
+        return;
+      }
       setPhase("success");
       onSuccess();
       // Let the success check and the page transition play before navigating.
@@ -121,15 +130,15 @@ export function LoginForm({ next, onSuccess }: { next: string; onSuccess: () => 
         </AnimatePresence>
 
         <motion.div {...stagger(2)}>
-          <SubmitButton phase={phase} />
+          <SubmitButton phase={phase} label="Sign in" busyLabel="Signing you in" />
         </motion.div>
       </form>
     </motion.div>
   );
 }
 
-/** Sign In → progress sweep while authenticating → check mark on success. */
-function SubmitButton({ phase }: { phase: Phase }) {
+/** Label → progress sweep while working → check mark on success. */
+export function SubmitButton({ phase, label, busyLabel }: { phase: Phase; label: string; busyLabel: string }) {
   return (
     <motion.button
       type="submit"
@@ -155,7 +164,7 @@ function SubmitButton({ phase }: { phase: Phase }) {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18 }}
           >
-            Sign in
+            {label}
             <ArrowRight className="size-[18px] transition-transform duration-200 group-hover:translate-x-1" />
           </motion.span>
         )}
@@ -168,7 +177,7 @@ function SubmitButton({ phase }: { phase: Phase }) {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18 }}
           >
-            Signing you in
+            {busyLabel}
           </motion.span>
         )}
         {phase === "success" && (

@@ -4,24 +4,37 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BrandLogo, LogoMark } from "@/components/ui/logo";
-import { useBranding, useSession } from "@/lib/auth/session";
+import { useBranding, useLogout, useSession } from "@/lib/auth/session";
 import { LoginBackdrop } from "./login-backdrop";
-import { LoginForm, safeNextPath } from "./login-form";
+import { changePasswordPath, LoginForm, safeNextPath } from "./login-form";
+import { SetPasswordForm } from "./set-password-form";
 import { LoginVisual } from "./login-visual";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
-export function LoginScreen() {
+/**
+ * The sign-in screen, and its second step: choosing a password after signing in with a temporary
+ * one (mode "set-password", at /change-password). Both share the premium backdrop and card.
+ */
+export function LoginScreen({ mode = "sign-in" }: { mode?: "sign-in" | "set-password" }) {
   const router = useRouter();
   const next = safeNextPath(useSearchParams().get("next"));
   const { data: branding } = useBranding();
   const { data: session } = useSession();
+  const logout = useLogout();
   const [leaving, setLeaving] = useState(false);
+  const settingPassword = mode === "set-password";
 
-  // Already signed in (valid cookie): go straight to the app.
+  // Send the user wherever their session says they belong.
   useEffect(() => {
-    if (session && !leaving) router.replace(next);
-  }, [session, leaving, next, router]);
+    if (leaving || session === undefined) return;
+    if (settingPassword) {
+      if (session === null) router.replace("/login");
+      else if (!session.user.mustChangePassword) router.replace(next);
+    } else if (session) {
+      router.replace(session.user.mustChangePassword ? changePasswordPath(next) : next);
+    }
+  }, [session, leaving, settingPassword, next, router]);
 
   const name = branding?.crmName ?? "GrowDesk";
   const tagline = branding?.tagline ?? "";
@@ -91,11 +104,27 @@ export function LoginScreen() {
               transition={{ duration: 0.6, delay: 0.4, ease }}
               className="mb-8 [@media(max-height:700px)]:mb-6"
             >
-              <h2 className="font-display text-[28px] font-bold tracking-tight">Welcome back</h2>
-              <p className="mt-1.5 text-sm text-white/55">Sign in to continue to {name}.</p>
+              {settingPassword ? (
+                <>
+                  <h2 className="font-display text-[28px] font-bold tracking-tight">Choose your password</h2>
+                  <p className="mt-1.5 text-sm text-white/55">
+                    {session?.user ? `Welcome, ${session.user.fullName.split(" ")[0]}. ` : ""}
+                    Replace your temporary password with one only you know.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="font-display text-[28px] font-bold tracking-tight">Welcome back</h2>
+                  <p className="mt-1.5 text-sm text-white/55">Sign in to continue to {name}.</p>
+                </>
+              )}
             </motion.div>
 
-            <LoginForm next={next} onSuccess={() => setLeaving(true)} />
+            {settingPassword ? (
+              <SetPasswordForm next={next} onSuccess={() => setLeaving(true)} />
+            ) : (
+              <LoginForm next={next} onSuccess={() => setLeaving(true)} />
+            )}
           </div>
 
           <motion.p
@@ -104,7 +133,21 @@ export function LoginScreen() {
             transition={{ delay: 1.1, duration: 0.6 }}
             className="mt-6 text-center text-xs text-white/35 [@media(max-height:700px)]:mt-4"
           >
-            Trouble signing in? Ask your administrator to reset your password.
+            {settingPassword ? (
+              <>
+                Not you?{" "}
+                <button
+                  type="button"
+                  onClick={() => logout.mutate()}
+                  disabled={logout.isPending}
+                  className="font-medium text-white/60 underline-offset-4 transition-colors hover:text-white hover:underline"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              "Trouble signing in? Ask your administrator to reset your password."
+            )}
           </motion.p>
         </motion.div>
       </section>

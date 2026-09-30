@@ -96,8 +96,7 @@ public class AdminIntegrationTests(ApiFactory factory) : IClassFixture<ApiFactor
         await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
             new CreateUserRequest("Staff Member", "Staff_One", null, await RoleIdAsync(admin, "Staff"), "Staff-Pass-1")));
 
-        var staff = factory.CreateCookieClient();
-        (await staff.PostAsJsonAsync("/api/auth/login", new LoginRequest("Staff_One", "Staff-Pass-1"))).EnsureSuccessStatusCode();
+        var staff = await factory.SignInNewUserAsync("Staff_One", "Staff-Pass-1");
 
         Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync("/api/lead-sources")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,
@@ -148,6 +147,83 @@ public class AdminIntegrationTests(ApiFactory factory) : IClassFixture<ApiFactor
             (await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("Dr_Maria", "Doctor-Pass-1"))).StatusCode);
         Assert.Equal(HttpStatusCode.OK,
             (await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("Dr_Maria", "New-Pass-99"))).StatusCode);
+    }
+
+    // ---- Password changes ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task New_user_must_change_password_before_using_the_app()
+    {
+        var admin = await AdminAsync();
+        var user = await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("New Starter", "New_Starter", null, await RoleIdAsync(admin, "Receptionist"), "Temp-Pass-1")));
+        Assert.True(user.MustChangePassword);
+
+        var client = factory.CreateCookieClient();
+        var login = await DataAsync<SessionDto>(await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("New_Starter", "Temp-Pass-1")));
+        Assert.True(login.User.MustChangePassword);
+
+        // Everything except the session check and the change itself is refused until then.
+        var blocked = await client.GetAsync("/api/customers");
+        Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+        var body = await blocked.Content.ReadFromJsonAsync<ApiResponse<object>>();
+        Assert.Contains(body!.Errors!, e => e.Field == "password_change_required");
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/settings/branding")).StatusCode);
+
+        // Wrong current password, same password, weak password.
+        var wrong = await client.PostAsJsonAsync("/api/auth/change-password", new ChangePasswordRequest("Nope-1234", "Mine-Pass-22"));
+        Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+        Assert.Equal("Your current password is incorrect.", await MessageAsync(wrong));
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await client.PostAsJsonAsync("/api/auth/change-password", new ChangePasswordRequest("Temp-Pass-1", "Temp-Pass-1"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await client.PostAsJsonAsync("/api/auth/change-password", new ChangePasswordRequest("Temp-Pass-1", "short"))).StatusCode);
+
+        var changed = await DataAsync<SessionDto>(await client.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest("Temp-Pass-1", "Mine-Pass-22")));
+        Assert.False(changed.User.MustChangePassword);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/customers")).StatusCode);
+
+        // The old password no longer works; the new one does, without another forced change.
+        var fresh = factory.CreateCookieClient();
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await fresh.PostAsJsonAsync("/api/auth/login", new LoginRequest("New_Starter", "Temp-Pass-1"))).StatusCode);
+        var again = await DataAsync<SessionDto>(await fresh.PostAsJsonAsync("/api/auth/login", new LoginRequest("New_Starter", "Mine-Pass-22")));
+        Assert.False(again.User.MustChangePassword);
+    }
+
+    [Fact]
+    public async Task Admin_reset_requires_a_change_even_in_an_existing_session()
+    {
+        var admin = await AdminAsync();
+        var user = await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("Reset Me", "Reset_Me", null, await RoleIdAsync(admin, "Staff"), "Temp-Pass-2")));
+        var staff = await factory.SignInNewUserAsync("Reset_Me", "Temp-Pass-2");
+        Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync("/api/customers")).StatusCode);
+
+        (await admin.PostAsJsonAsync($"/api/users/{user.Id}/reset-password", new ResetPasswordRequest("Reset-Pass-3"))).EnsureSuccessStatusCode();
+        Assert.True((await DataAsync<List<UserDto>>(await admin.GetAsync("/api/users"))).Single(u => u.Id == user.Id).MustChangePassword);
+
+        // The open session is gated straight away, and can only continue with the reset password.
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync("/api/customers")).StatusCode);
+        (await staff.PostAsJsonAsync("/api/auth/change-password", new ChangePasswordRequest("Reset-Pass-3", "Mine-Pass-44"))).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync("/api/customers")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Any_user_can_change_their_own_password()
+    {
+        var admin = await AdminAsync();
+        await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("Changer", "Changer_One", null, await RoleIdAsync(admin, "Doctor"), "Temp-Pass-5")));
+        var doctor = await factory.SignInNewUserAsync("Changer_One", "Temp-Pass-5");
+
+        var session = await DataAsync<SessionDto>(await doctor.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest("Temp-Pass-5-own", "Second-Pass-6")));
+        Assert.False(session.User.MustChangePassword);
+        Assert.Equal(HttpStatusCode.OK,
+            (await factory.CreateCookieClient().PostAsJsonAsync("/api/auth/login", new LoginRequest("Changer_One", "Second-Pass-6"))).StatusCode);
     }
 
     [Fact]

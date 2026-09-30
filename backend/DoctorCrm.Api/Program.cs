@@ -66,9 +66,11 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
             {
                 var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
                 // No cancellation token: an aborted request must not be mistaken for a failed check.
-                var active = int.TryParse(ctx.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out var id)
-                    && await db.Users.AnyAsync(u => u.Id == id && u.IsActive);
-                if (!active) ctx.Fail("User is inactive or no longer exists.");
+                var state = int.TryParse(ctx.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out var id)
+                    ? await db.Users.Where(u => u.Id == id && u.IsActive).Select(u => new { u.MustChangePassword }).SingleOrDefaultAsync()
+                    : null;
+                if (state is null) ctx.Fail("User is inactive or no longer exists.");
+                else if (state.MustChangePassword) PasswordChangeGate.Flag(ctx.HttpContext);
             },
             OnChallenge = async ctx =>
             {
@@ -170,6 +172,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<PasswordChangeGate>();
 app.UseAuthorization();
 
 app.MapControllers();

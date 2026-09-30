@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { toastError, useRoles, useUserMutations, useUsers } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
+import { isStrongPassword, PASSWORD_MESSAGE } from "@/lib/auth/password";
 import { useSession } from "@/lib/auth/session";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { Permission } from "@/lib/permissions";
@@ -27,8 +28,7 @@ import type { AdminUser } from "@/types/admin";
 // Mirrors backend Validators/AdminValidators.cs.
 const USERNAME = /^[A-Za-z0-9._-]{3,50}$/;
 const usernameMessage = "Use 3–50 letters, numbers, dots, dashes or underscores (no spaces).";
-const passwordMessage = "Use at least 8 characters, including a letter and a number.";
-const isStrongPassword = (v: string) => v.length >= 8 && /[A-Za-z]/.test(v) && /\d/.test(v);
+const passwordMessage = PASSWORD_MESSAGE;
 const password = z.string().refine(isStrongPassword, passwordMessage);
 
 /** One schema for add and edit; the password is only checked when adding. */
@@ -138,6 +138,11 @@ export default function UsersPage() {
                   <div className="flex items-center gap-2">
                     {u.roleName && <Badge tone={ROLE_TONES[u.roleName] ?? "neutral"}>{u.roleName}</Badge>}
                     {!u.isActive && <Badge tone="muted">Inactive</Badge>}
+                    {u.isActive && u.mustChangePassword && (
+                      <Badge tone="warning" className="hidden sm:inline-flex">
+                        Temporary password
+                      </Badge>
+                    )}
                   </div>
 
                   <p className="w-32 text-xs text-muted" title={u.lastLoginAt ? formatDateTime(u.lastLoginAt) : undefined}>
@@ -185,8 +190,8 @@ export default function UsersPage() {
         )}
       </Card>
 
-      <UserDrawer key={editing === "new" ? "new" : editing?.id ?? "closed"} user={editing} onClose={() => setEditing(null)} />
-      <ResetPasswordDrawer key={resetting?.id ?? "closed"} user={resetting} onClose={() => setResetting(null)} />
+      <UserDrawer key={editing === "new" ? "new" : editing?.id ?? "edit-closed"} user={editing} onClose={() => setEditing(null)} />
+      <ResetPasswordDrawer key={resetting?.id ?? "reset-closed"} user={resetting} onClose={() => setResetting(null)} />
     </RequirePermission>
   );
 }
@@ -236,7 +241,7 @@ function UserDrawer({ user, onClose }: { user: AdminUser | "new" | null; onClose
       open={user !== null}
       onOpenChange={(open) => !open && onClose()}
       title={existing ? "Edit user" : "Add user"}
-      description={existing ? undefined : "They'll sign in with the username and password you set here."}
+      description={existing ? undefined : "They'll sign in with this username and temporary password, then choose their own password."}
       footer={
         <>
           <Button type="button" variant="secondary" onClick={onClose}>
@@ -310,7 +315,7 @@ function ResetPasswordDrawer({ user, onClose }: { user: AdminUser | null; onClos
     if (!user) return;
     try {
       await resetPassword.mutateAsync({ id: user.id, newPassword });
-      toast.success(`Password reset for ${user.fullName}`);
+      toast.success(`Password reset for ${user.fullName}. They'll choose a new one when they sign in.`);
       onClose();
     } catch (error) {
       toastError(error);
@@ -322,7 +327,7 @@ function ResetPasswordDrawer({ user, onClose }: { user: AdminUser | null; onClos
       open={user !== null}
       onOpenChange={(open) => !open && onClose()}
       title="Reset password"
-      description={user ? `Set a new password for ${user.fullName} (${user.username}). Tell them in person or over a secure channel.` : undefined}
+      description={user ? `Set a temporary password for ${user.fullName} (${user.username}) and tell them in person or over a secure channel. They'll choose their own when they next sign in.` : undefined}
       footer={
         <>
           <Button type="button" variant="secondary" onClick={onClose}>

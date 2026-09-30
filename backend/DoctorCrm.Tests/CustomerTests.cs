@@ -218,8 +218,7 @@ public class CustomerIntegrationTests(ApiFactory factory) : IClassFixture<ApiFac
         await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
             new CreateUserRequest("Viewer", username, null, roles.Single(r => r.Name == "Staff").Id, "Viewer-Pass-1")));
 
-        var staff = factory.CreateCookieClient();
-        (await staff.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, "Viewer-Pass-1"))).EnsureSuccessStatusCode();
+        var staff = await factory.SignInNewUserAsync(username, "Viewer-Pass-1");
         Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync("/api/customers")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsJsonAsync("/api/customers", Customer("Nope", NewNumber()))).StatusCode);
     }

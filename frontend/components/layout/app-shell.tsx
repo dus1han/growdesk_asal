@@ -6,8 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UNAUTHORIZED_EVENT } from "@/lib/api/client";
-import { useSession } from "@/lib/auth/session";
+import { PASSWORD_CHANGE_EVENT, UNAUTHORIZED_EVENT } from "@/lib/api/client";
+import { sessionQueryKey, useSession } from "@/lib/auth/session";
 import { MobileNav } from "./mobile-nav";
 import { Sidebar } from "./sidebar";
 
@@ -53,6 +53,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [isPending, isError, session, router, pathname]);
 
+  // A temporary password (new account or admin reset) must be replaced before using the app.
+  const mustChangePassword = !!session?.user.mustChangePassword;
+  useEffect(() => {
+    if (mustChangePassword) router.replace(`/change-password?next=${encodeURIComponent(pathname)}`);
+  }, [mustChangePassword, router, pathname]);
+
+  // The API says so mid-session (an admin just reset the password): refresh the session to redirect.
+  useEffect(() => {
+    const onPasswordChange = () => void queryClient.invalidateQueries({ queryKey: sessionQueryKey });
+    window.addEventListener(PASSWORD_CHANGE_EVENT, onPasswordChange);
+    return () => window.removeEventListener(PASSWORD_CHANGE_EVENT, onPasswordChange);
+  }, [queryClient]);
+
   // Any API call answering 401 ends the session.
   useEffect(() => {
     const onUnauthorized = () => endSession("Your session has expired. Please sign in again.");
@@ -68,7 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer);
   }, [session, endSession]);
 
-  if (isPending || !session) return <ShellSkeleton />;
+  if (isPending || !session || mustChangePassword) return <ShellSkeleton />;
 
   return (
     <div className="flex min-h-dvh">

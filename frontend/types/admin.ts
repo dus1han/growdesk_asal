@@ -30,6 +30,7 @@ export interface AdminUser {
   roleId: number | null;
   roleName: string | null;
   isActive: boolean;
+  mustChangePassword: boolean;
   lastLoginAt: string | null;
   createdAt: string;
 }

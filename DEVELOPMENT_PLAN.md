@@ -15,7 +15,8 @@ The CRM is built in **8 milestones**. Each one ends with both apps building, mig
 | 3 — Customers | **Done** (2026-09-30) |
 | 4 — Bookings and calendar | **Done** (2026-09-30) |
 | 5 — Payments | **Done** (2026-09-30) |
-| 6 — Dashboard | Next (after change password) |
+| Change password (added) | **Done** (2026-09-30) |
+| 6 — Dashboard | Next |
 
 ### Environment as built
 
@@ -184,6 +185,12 @@ Frontend
 - [x] Summary cards (collected, outstanding, waived) and Excel export of the filtered rows
 
 **Notes:** payments are append-only. Settling a pending consultation adds a new Paid entry; the latest entry is the booking's current state. The list shows current entries by default, with a "Full history" switch for superseded ones.
+
+### Added — Change password
+- [x] Any user can change their own password (key icon in the sidebar user area); current password always required
+- [x] New accounts and admin password resets get a temporary password: the user must choose their own on next sign-in (second step on the login screen, `/change-password`)
+- [x] Enforced by the API (`PasswordChangeGate`): until changed, every endpoint answers 403 except session check, change password and anonymous ones; an admin reset also gates sessions already open
+- [x] Users list shows a "Temporary password" badge
 
 ### Milestone 6 — Dashboard (§10, §11, §29)
 - [ ] `GET /api/dashboard` — real data only

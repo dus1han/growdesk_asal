@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using DoctorCrm.Api.Authentication;
+using DoctorCrm.Api.Authorization;
 using DoctorCrm.Api.DTOs;
 using DoctorCrm.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -50,9 +51,24 @@ public class AuthController(AuthService auth, IOptions<AuthCookieOptions> cookie
         return Ok(ApiResponse.Ok("Signed out."));
     }
 
+    /// <summary>Changes the signed-in user's password (also completes a required first-login change).</summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    [AllowWhilePasswordChangeRequired]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
+    public async Task<ActionResult<ApiResponse<SessionDto>>> ChangePassword(ChangePasswordRequest request, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(ApiResponse.Fail("Your session has expired. Please sign in again."));
+
+        await auth.ChangePasswordAsync(userId, request, ct);
+        return await Me(ct);
+    }
+
     /// <summary>The signed-in user with roles, permissions and session expiry.</summary>
     [HttpGet("me")]
     [Authorize]
+    [AllowWhilePasswordChangeRequired]
     public async Task<ActionResult<ApiResponse<SessionDto>>> Me(CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))

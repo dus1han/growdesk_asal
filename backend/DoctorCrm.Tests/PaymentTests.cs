@@ -131,8 +131,7 @@ public class PaymentIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         var username = $"staff_p{Interlocked.Increment(ref _seq)}";
         await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
             new CreateUserRequest("Staff", username, null, roles.Single(r => r.Name == "Staff").Id, "Staff-Pass-1")));
-        var staff = factory.CreateCookieClient();
-        (await staff.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, "Staff-Pass-1"))).EnsureSuccessStatusCode();
+        var staff = await factory.SignInNewUserAsync(username, "Staff-Pass-1");
 
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync("/api/payments")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync("/api/payments/summary")).StatusCode);

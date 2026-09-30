@@ -1,9 +1,11 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { KeyRound, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { ChangePasswordDrawer } from "@/components/auth/change-password-drawer";
 import { LogoMark } from "@/components/ui/logo";
 import { useBranding, useLogout } from "@/lib/auth/session";
 import { can } from "@/lib/permissions";
@@ -25,6 +27,7 @@ interface SidebarProps {
 export function Sidebar({ user, collapsed, onToggle, variant = "desktop", onNavigate }: SidebarProps) {
   const { data: branding } = useBranding();
   const logout = useLogout();
+  const [changingPassword, setChangingPassword] = useState(false);
   const isCollapsed = variant === "desktop" && collapsed;
   const main = mainNav.filter((i) => can(user, i.permission));
   const management = managementNav.filter((i) => can(user, i.permission));
@@ -118,6 +121,14 @@ export function Sidebar({ user, collapsed, onToggle, variant = "desktop", onNavi
             </div>
           )}
           <button
+            onClick={() => setChangingPassword(true)}
+            aria-label="Change password"
+            title="Change password"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+          >
+            <KeyRound className="size-4" />
+          </button>
+          <button
             onClick={() => logout.mutate()}
             disabled={logout.isPending}
             aria-label="Sign out"
@@ -128,6 +139,7 @@ export function Sidebar({ user, collapsed, onToggle, variant = "desktop", onNavi
           </button>
         </div>
       </div>
+      <ChangePasswordDrawer open={changingPassword} onClose={() => setChangingPassword(false)} />
     </motion.aside>
   );
 }

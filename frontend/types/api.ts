@@ -18,6 +18,8 @@ export interface CurrentUser {
   email: string | null;
   roles: string[];
   permissions: string[];
+  /** Set after an admin creates the account or resets its password (see /change-password). */
+  mustChangePassword: boolean;
 }
 
 export interface Session {

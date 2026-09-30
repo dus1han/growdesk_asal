@@ -33,6 +33,15 @@ export function useLogin() {
   });
 }
 
+/** Changes the signed-in user's password; the API returns the refreshed session. */
+export function useChangePassword() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { currentPassword: string; newPassword: string }) => api.post<Session>("/auth/change-password", input),
+    onSuccess: (session) => queryClient.setQueryData(sessionQueryKey, session),
+  });
+}
+
 export function useLogout() {
   const queryClient = useQueryClient();
   const router = useRouter();

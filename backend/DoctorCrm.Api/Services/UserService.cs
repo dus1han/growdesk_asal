@@ -48,6 +48,7 @@ public class UserService(AppDbContext db, AuditService audit)
             NormalizedUsername = AuthService.NormalizeUsername(username),
             Email = NormalizeEmail(request.Email),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12),
+            MustChangePassword = true,
         };
         user.UserRoles.Add(new UserRole { Role = role });
         db.Users.Add(user);
@@ -110,6 +111,7 @@ public class UserService(AppDbContext db, AuditService audit)
     {
         var user = await FindAsync(id, ct);
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword, workFactor: 12);
+        user.MustChangePassword = true;
         audit.Record(actorId, "Password Reset", nameof(User), id, new { user.Username });
         await db.SaveChangesAsync(ct);
     }
@@ -125,6 +127,7 @@ public class UserService(AppDbContext db, AuditService audit)
         u.UserRoles.Select(ur => (int?)ur.RoleId).FirstOrDefault(),
         u.UserRoles.Select(ur => ur.Role.Name).FirstOrDefault(),
         u.IsActive,
+        u.MustChangePassword,
         u.LastLoginAt,
         u.CreatedAt);
 

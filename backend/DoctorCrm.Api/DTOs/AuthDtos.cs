@@ -8,7 +8,10 @@ public record CurrentUserDto(
     string Username,
     string? Email,
     IReadOnlyList<string> Roles,
-    IReadOnlyList<string> Permissions);
+    IReadOnlyList<string> Permissions,
+    bool MustChangePassword);
+
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 
 public record SessionDto(CurrentUserDto User, DateTime ExpiresAt);
 

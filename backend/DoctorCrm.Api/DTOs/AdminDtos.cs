@@ -33,6 +33,7 @@ public record UserDto(
     int? RoleId,
     string? RoleName,
     bool IsActive,
+    bool MustChangePassword,
     DateTime? LastLoginAt,
     DateTime CreatedAt);
 
