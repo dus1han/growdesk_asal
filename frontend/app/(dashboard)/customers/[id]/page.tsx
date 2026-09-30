@@ -23,6 +23,7 @@ import { BookingDetailsDrawer } from "@/components/bookings/booking-details-draw
 import { BookingFormDrawer } from "@/components/bookings/booking-form-drawer";
 import { CustomerBookingsCard } from "@/components/customers/customer-bookings-card";
 import { CustomerPaymentsCard } from "@/components/customers/customer-payments-card";
+import { whatsAppUrl } from "@/components/customers/whatsapp-link";
 import { CustomerFormDrawer } from "@/components/customers/customer-form-drawer";
 import { StageBadge } from "@/components/customers/stage-badge";
 import { RequirePermission } from "@/components/layout/require-permission";
@@ -176,7 +177,6 @@ function ProfileHeader({
   onEdit: () => void;
   onBook?: () => void;
 }) {
-  const waDigits = customer.whatsApp?.replace(/\D/g, "");
   return (
     <Card className="relative overflow-hidden p-5 sm:p-6">
       <div
@@ -217,7 +217,7 @@ function ProfileHeader({
 
       <div className="relative mt-5 flex flex-wrap gap-2">
         {customer.whatsApp && (
-          <ContactPill icon={MessageCircle} label={customer.whatsApp} href={`https://wa.me/${waDigits}`} title="Open in WhatsApp" />
+          <ContactPill icon={MessageCircle} label={customer.whatsApp} href={whatsAppUrl(customer.whatsApp)} title="Open in WhatsApp" />
         )}
         {customer.instagram && (
           <ContactPill icon={AtSign} label={customer.instagram} href={`https://instagram.com/${customer.instagram}`} title="Open on Instagram" />

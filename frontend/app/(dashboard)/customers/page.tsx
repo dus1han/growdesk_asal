@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { CustomerFormDrawer } from "@/components/customers/customer-form-drawer";
 import { StageBadge, TreatmentChips } from "@/components/customers/stage-badge";
+import { WhatsAppLink } from "@/components/customers/whatsapp-link";
 import { PageHeader } from "@/components/layout/page-header";
 import { RequirePermission } from "@/components/layout/require-permission";
 import { Button } from "@/components/ui/button";
@@ -221,7 +222,7 @@ function CustomerTable({ items, onOpen }: { items: CustomerListItem[]; onOpen: (
                   </div>
                 </div>
               </td>
-              <td className="whitespace-nowrap px-4 py-3 tabular-nums text-foreground/80">{c.whatsApp ?? <span className="text-muted">—</span>}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-foreground/80">{c.whatsApp ? <WhatsAppLink number={c.whatsApp} /> : <span className="text-muted">—</span>}</td>
               <td className="px-4 py-3">
                 <TreatmentChips treatments={c.treatments} max={2} />
               </td>
@@ -256,7 +257,15 @@ function CustomerCards({ items, onOpen }: { items: CustomerListItem[]; onOpen: (
     <ul className="divide-y divide-line md:hidden">
       {items.map((c) => (
         <li key={c.id}>
-          <button type="button" onClick={() => onOpen(c.id)} className="flex w-full items-start gap-3 p-4 text-left active:bg-surface-muted">
+          {/* A clickable card rather than a <button>, so the WhatsApp link inside is valid. */}
+          <div
+            role="link"
+            tabIndex={0}
+            aria-label={`Open ${c.name}`}
+            onClick={() => onOpen(c.id)}
+            onKeyDown={(e) => e.key === "Enter" && onOpen(c.id)}
+            className="flex w-full cursor-pointer items-start gap-3 p-4 text-left focus-visible:bg-surface-muted focus-visible:outline-none active:bg-surface-muted"
+          >
             <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand/80 to-accent/80 text-xs font-bold text-white">
               {initials(c.name)}
             </span>
@@ -265,9 +274,12 @@ function CustomerCards({ items, onOpen }: { items: CustomerListItem[]; onOpen: (
                 <p className="truncate font-semibold">{c.name}</p>
                 <StageBadge name={c.stage.name} color={c.stage.color} className="shrink-0" />
               </div>
-              <p className="truncate text-xs text-muted">
-                {[c.whatsApp, c.instagram && `@${c.instagram}`].filter(Boolean).join(" · ")}
-              </p>
+              {(c.whatsApp || c.instagram) && (
+                <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted">
+                  {c.whatsApp && <WhatsAppLink number={c.whatsApp} className="text-foreground/80" />}
+                  {c.instagram && <span className="truncate">@{c.instagram}</span>}
+                </p>
+              )}
               <TreatmentChips treatments={c.treatments} max={3} />
               {c.nextBooking && (
                 <p className="text-xs text-muted">
@@ -280,7 +292,7 @@ function CustomerCards({ items, onOpen }: { items: CustomerListItem[]; onOpen: (
                 </p>
               )}
             </div>
-          </button>
+          </div>
         </li>
       ))}
     </ul>
