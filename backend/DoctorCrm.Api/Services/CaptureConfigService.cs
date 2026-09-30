@@ -36,16 +36,15 @@ public class CaptureConfigService(AppDbContext db, AuditService audit)
             throw new BusinessRuleException("The field list changed while you were editing it. Please refresh and try again.",
                 StatusCodes.Status409Conflict);
 
+        // STOP needs a condition: without a required field the toolbar could save an empty lead.
+        if (!fields.Any(f => f.IsEnabled && f.IsRequired))
+            throw new BusinessRuleException("Mark at least one field as required, so every captured lead can be identified.");
+
         var now = DateTime.UtcNow;
         for (var i = 0; i < fields.Count; i++)
         {
             var f = fields[i];
             var row = editable.Single(r => r.FieldKey == f.Key);
-            var builtIn = CaptureFields.Find(f.Key);
-
-            if (builtIn is { Locked: true } && (!f.IsEnabled || !f.IsRequired))
-                throw new BusinessRuleException($"{builtIn.Label} is always shown and required in the capture tool.");
-
             row.IsEnabled = f.IsEnabled;
             row.IsRequired = f.IsEnabled && f.IsRequired; // a hidden field can't be required
             row.DisplayOrder = i + 1;
@@ -66,12 +65,12 @@ public class CaptureConfigService(AppDbContext db, AuditService audit)
     {
         if (row.CustomField is { } cf)
             return new CaptureFieldDto(row.FieldKey, cf.Label, cf.FieldType.ToString().ToLowerInvariant(), IsCustom: true,
-                Locked: false, row.IsEnabled, row.IsRequired, row.DisplayOrder);
+                row.IsEnabled, row.IsRequired, row.DisplayOrder);
 
         var builtIn = CaptureFields.Find(row.FieldKey);
         return builtIn is null
             ? null
-            : new CaptureFieldDto(row.FieldKey, builtIn.Label, builtIn.Type, IsCustom: false, builtIn.Locked,
+            : new CaptureFieldDto(row.FieldKey, builtIn.Label, builtIn.Type, IsCustom: false,
                 row.IsEnabled, row.IsRequired, row.DisplayOrder);
     }
 }

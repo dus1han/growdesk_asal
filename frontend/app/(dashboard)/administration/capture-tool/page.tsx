@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { CircleAlert, Lock, RotateCcw } from "lucide-react";
+import { CircleAlert, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { CaptureToolbarPreview } from "@/components/admin/capture-toolbar-preview";
@@ -51,7 +51,7 @@ export default function CaptureToolPage() {
     <>
       <PageHeader
         title="Capture Tool"
-        description="Choose which fields the CRM Capture toolbar collects on WhatsApp Web and Instagram, which are required, and their order."
+        description="Choose which fields the CRM Capture toolbar collects on WhatsApp Web and Instagram, and their order. Required fields must be captured before STOP can save."
       />
 
       {isPending ? (
@@ -97,20 +97,15 @@ export default function CaptureToolPage() {
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 px-1">
                       <span className={cn("truncate text-sm font-medium", !f.isEnabled && "text-muted")}>{f.label}</span>
                       {f.isCustom && <Badge>Custom</Badge>}
-                      {f.locked && (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-muted" title="Always shown and required: WhatsApp identifies returning customers.">
-                          <Lock className="size-3" /> Always required
-                        </span>
-                      )}
                     </div>
                     <span className="flex w-12 justify-center">
-                      <Switch size="sm" checked={f.isEnabled} disabled={f.locked} onCheckedChange={(v) => patch(f.key, { isEnabled: v })} label={`Show ${f.label}`} />
+                      <Switch size="sm" checked={f.isEnabled} onCheckedChange={(v) => patch(f.key, { isEnabled: v })} label={`Show ${f.label}`} />
                     </span>
                     <span className="flex w-16 justify-center">
                       <Switch
                         size="sm"
                         checked={f.isRequired}
-                        disabled={f.locked || !f.isEnabled}
+                        disabled={!f.isEnabled}
                         onCheckedChange={(v) => patch(f.key, { isRequired: v })}
                         label={`Require ${f.label}`}
                       />

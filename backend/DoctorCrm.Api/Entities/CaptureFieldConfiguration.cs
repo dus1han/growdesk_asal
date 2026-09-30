@@ -23,26 +23,26 @@ public class CaptureFieldConfiguration
 /// <summary>The built-in customer fields the capture tool can collect.</summary>
 public static class CaptureFields
 {
-    public record BuiltIn(string Key, string Label, string Type, bool Locked, bool DefaultEnabled, bool DefaultRequired);
+    public record BuiltIn(string Key, string Label, string Type, bool DefaultEnabled, bool DefaultRequired);
 
     public const string Name = "name";
     public const string WhatsApp = "whatsapp";
 
     /// <summary>
-    /// Name and WhatsApp are locked on and required: WhatsApp is how duplicate customers are
-    /// detected (spec §35), and a customer without a name cannot be worked with.
+    /// Every field, including Name and WhatsApp, is configurable: the admin decides what the
+    /// CRM Capture toolbar must collect before STOP can save (decided 2026-09-30).
     /// </summary>
     public static readonly IReadOnlyList<BuiltIn> BuiltIns =
     [
-        new(Name, "Name", "text", Locked: true, DefaultEnabled: true, DefaultRequired: true),
-        new(WhatsApp, "WhatsApp Number", "phone", Locked: true, DefaultEnabled: true, DefaultRequired: true),
-        new("secondary_phone", "Secondary Number", "phone", false, true, false),
-        new("instagram", "Instagram", "text", false, true, false),
-        new("treatments", "Interested Treatments", "multiselect", false, true, false),
-        new("stage", "Stage", "dropdown", false, true, false),
-        new("lead_source", "Lead Source", "dropdown", false, false, false),
-        new("notes", "Notes", "textarea", false, false, false),
-        new("email", "Email", "email", false, false, false),
+        new(Name, "Name", "text", DefaultEnabled: true, DefaultRequired: true),
+        new(WhatsApp, "WhatsApp Number", "phone", DefaultEnabled: true, DefaultRequired: true),
+        new("secondary_phone", "Secondary Number", "phone", true, false),
+        new("instagram", "Instagram", "text", true, false),
+        new("treatments", "Interested Treatments", "multiselect", true, false),
+        new("stage", "Stage", "dropdown", true, false),
+        new("lead_source", "Lead Source", "dropdown", false, false),
+        new("notes", "Notes", "textarea", false, false),
+        new("email", "Email", "email", false, false),
     ];
 
     public static BuiltIn? Find(string key) => BuiltIns.FirstOrDefault(b => b.Key == key);

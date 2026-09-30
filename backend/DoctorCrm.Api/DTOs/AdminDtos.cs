@@ -72,7 +72,6 @@ public record CaptureFieldDto(
     string Label,
     string Type,
     bool IsCustom,
-    bool Locked,
     bool IsEnabled,
     bool IsRequired,
     int DisplayOrder);

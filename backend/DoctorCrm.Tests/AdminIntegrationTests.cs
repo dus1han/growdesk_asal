@@ -210,15 +210,25 @@ public class AdminIntegrationTests(ApiFactory factory) : IClassFixture<ApiFactor
     // ---- Capture configuration ----------------------------------------------------------------
 
     [Fact]
-    public async Task Capture_fields_keep_name_and_whatsapp_required_and_save_order()
+    public async Task Capture_fields_are_admin_controlled_but_need_one_required_field()
     {
         var admin = await AdminAsync();
         var fields = await DataAsync<List<CaptureFieldDto>>(await admin.GetAsync("/api/admin/capture-fields"));
-        Assert.All(fields.Where(f => f.Key is "name" or "whatsapp"), f => Assert.True(f.Locked && f.IsEnabled && f.IsRequired));
+        Assert.All(fields.Where(f => f.Key is "name" or "whatsapp"), f => Assert.True(f.IsEnabled && f.IsRequired));
 
-        var hideName = fields.Select(f => new SaveCaptureField(f.Key, f.Key != "name" && f.IsEnabled, f.IsRequired)).ToList();
-        Assert.Equal(HttpStatusCode.BadRequest,
-            (await admin.PutAsJsonAsync("/api/admin/capture-fields", new SaveCaptureFieldsRequest(hideName))).StatusCode);
+        // Nothing required: the toolbar could save an empty lead.
+        var noneRequired = fields.Select(f => new SaveCaptureField(f.Key, f.IsEnabled, false)).ToList();
+        var refused = await admin.PutAsJsonAsync("/api/admin/capture-fields", new SaveCaptureFieldsRequest(noneRequired));
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Contains("at least one field", await MessageAsync(refused));
+
+        // WhatsApp can be made optional, e.g. for Instagram leads with Instagram required.
+        var instagramLeads = fields.Select(f => new SaveCaptureField(f.Key,
+            f.Key == "instagram" || f.IsEnabled, f.Key is "name" or "instagram")).ToList();
+        var relaxed = await DataAsync<List<CaptureFieldDto>>(await admin.PutAsJsonAsync("/api/admin/capture-fields",
+            new SaveCaptureFieldsRequest(instagramLeads)));
+        Assert.False(relaxed.Single(f => f.Key == "whatsapp").IsRequired);
+        Assert.True(relaxed.Single(f => f.Key == "instagram").IsRequired);
 
         // Reverse the order, and ask for "notes" to be required while hidden: required is dropped.
         var request = fields.AsEnumerable().Reverse()

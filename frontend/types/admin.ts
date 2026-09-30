@@ -87,7 +87,6 @@ export interface CaptureField {
   label: string;
   type: string;
   isCustom: boolean;
-  locked: boolean;
   isEnabled: boolean;
   isRequired: boolean;
   displayOrder: number;
