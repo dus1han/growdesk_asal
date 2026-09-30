@@ -45,8 +45,7 @@ async function copyStatic() {
     const file = resolve(DIST, 'manifest.json');
     const manifest = JSON.parse(await readFile(file, 'utf8'));
     manifest.update_url = updateUrl;
-    await writeFile(file, JSON.stringify(manifest, null, 2) + '
-');
+    await writeFile(file, `${JSON.stringify(manifest, null, 2)}\n`);
     console.log(`[build] update_url -> ${updateUrl}`);
   }
 }
