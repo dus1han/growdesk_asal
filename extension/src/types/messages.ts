@@ -15,8 +15,6 @@ export type ContentMessage =
   | { type: 'GD_OPEN_GUIDE' }
   /** Reload the extension from disk after new files were unzipped over it (Load unpacked installs). */
   | { type: 'GD_RELOAD_EXTENSION' }
-  /** Policy installs: ask Chrome to fetch the new version now and apply it. */
-  | { type: 'GD_UPDATE_NOW' }
   /** Opens chrome://extensions (a web page can't link to it; the extension can). */
   | { type: 'GD_OPEN_EXTENSIONS' };
 

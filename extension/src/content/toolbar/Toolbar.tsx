@@ -35,7 +35,6 @@ export interface ToolbarProps {
   installType?: string;
   /** Reload from disk after new files were unzipped over the old ones. */
   onReloadExtension: () => void;
-  onUpdateNow: () => Promise<string | null>;
   onOpenExtensions: () => void;
 }
 
@@ -118,7 +117,6 @@ export function Toolbar(props: ToolbarProps) {
             current={CURRENT_VERSION}
             installType={props.installType}
             onReload={props.onReloadExtension}
-            onUpdateNow={props.onUpdateNow}
             onOpenExtensions={props.onOpenExtensions}
           />
         )}

@@ -11,7 +11,6 @@ import { platformFromUrl } from '../utils/platform';
 
 const BUNDLE_KEY = 'growdesk-capture-config';
 const SETTINGS_KEY = 'growdesk-capture-settings';
-const RELOAD_TABS_KEY = 'growdesk-capture-reload-tabs';
 
 /** Pushes state (and an optional flash message) down to one tab's toolbar. */
 async function pushState(tabId: number, session: CaptureSession | null, flash?: string, flashTone: StatePushMessage['flashTone'] = 'success'): Promise<void> {
@@ -50,12 +49,11 @@ async function restoreMenus(): Promise<void> {
 
 chrome.runtime.onInstalled.addListener((details) => {
   void restoreMenus();
-  // Updated from the toolbar's Reload: refresh the WhatsApp / Instagram tabs that are already open (it never opens new ones) so they run the new version.
+  // After any update (Chrome's own, chrome://extensions, or the toolbar's Reload) the toolbar in
+  // open tabs is cut off from the extension. Refresh the WhatsApp / Instagram tabs that are
+  // already open (never opens new ones) so they run the new version.
   if (details.reason === 'update') {
-    void chrome.storage.local.get(RELOAD_TABS_KEY).then(async (stored) => {
-      if (!stored[RELOAD_TABS_KEY]) return;
-      await chrome.storage.local.remove(RELOAD_TABS_KEY);
-      const tabs = await chrome.tabs.query({ url: ['https://web.whatsapp.com/*', 'https://www.instagram.com/*'] });
+    void chrome.tabs.query({ url: ['https://web.whatsapp.com/*', 'https://www.instagram.com/*'] }).then((tabs) => {
       for (const tab of tabs) if (tab.id != null) void chrome.tabs.reload(tab.id);
     });
   }
@@ -141,31 +139,9 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendRespo
   if (message.type === 'GD_RELOAD_EXTENSION') {
     // After the new files were unzipped over the old ones: reload from disk, then refresh the
     // already-open WhatsApp / Instagram tabs so they get the new toolbar (see onInstalled).
-    void chrome.storage.local.set({ [RELOAD_TABS_KEY]: true }).then(() => chrome.runtime.reload());
+    chrome.runtime.reload();
     sendResponse({ ok: true });
     return false;
-  }
-  if (message.type === 'GD_UPDATE_NOW') {
-    void chrome.runtime
-      .requestUpdateCheck()
-      .then(async ({ status }) => {
-        if (status === 'update_available') {
-          // Chrome has downloaded it; reloading installs it, then onInstalled refreshes the tabs.
-          sendResponse({ ok: true });
-          await chrome.storage.local.set({ [RELOAD_TABS_KEY]: true });
-          chrome.runtime.reload();
-          return;
-        }
-        sendResponse({
-          ok: false,
-          error:
-            status === 'throttled'
-              ? 'Chrome checked a moment ago. Try again in a minute, or use Extensions below.'
-              : "Chrome hasn't found the new version yet. Try again in a minute, or use Extensions below.",
-        });
-      })
-      .catch(() => sendResponse({ ok: false, error: 'Could not check for the update. Use Extensions below.' }));
-    return true;
   }
   if (message.type === 'GD_OPEN_EXTENSIONS') {
     void chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` });
