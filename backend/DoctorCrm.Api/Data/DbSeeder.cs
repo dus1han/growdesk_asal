@@ -1,5 +1,6 @@
 using DoctorCrm.Api.Authorization;
 using DoctorCrm.Api.Entities;
+using DoctorCrm.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace DoctorCrm.Api.Data;
@@ -111,11 +112,11 @@ public class DbSeeder(AppDbContext db, IConfiguration config, ILogger<DbSeeder> 
     {
         if (await db.Users.AnyAsync(ct)) return;
 
-        var email = config["Seed:AdminEmail"]?.Trim().ToLowerInvariant();
+        var username = config["Seed:AdminUsername"]?.Trim();
         var password = config["Seed:AdminPassword"];
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         {
-            logger.LogWarning("No users exist and Seed:AdminEmail / Seed:AdminPassword are not set, so nobody can log in yet.");
+            logger.LogWarning("No users exist and Seed:AdminUsername / Seed:AdminPassword are not set, so nobody can log in yet.");
             return;
         }
 
@@ -123,13 +124,14 @@ public class DbSeeder(AppDbContext db, IConfiguration config, ILogger<DbSeeder> 
         var user = new User
         {
             FullName = config["Seed:AdminName"] ?? "Administrator",
-            Email = email,
+            Username = username,
+            NormalizedUsername = AuthService.NormalizeUsername(username),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
         };
         user.UserRoles.Add(new UserRole { Role = adminRole });
         db.Users.Add(user);
         await db.SaveChangesAsync(ct);
 
-        logger.LogInformation("Seeded first admin user {Email}", email);
+        logger.LogInformation("Seeded first admin user {Username}", username);
     }
 }

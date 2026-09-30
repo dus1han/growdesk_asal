@@ -16,14 +16,14 @@ public class TokenService(IOptions<JwtOptions> options)
     private readonly JwtOptions _options = options.Value;
 
     public (string Token, DateTime ExpiresAt) CreateToken(
-        int userId, string email, string fullName, IEnumerable<string> roles, IEnumerable<string> permissions)
+        int userId, string username, string fullName, IEnumerable<string> roles, IEnumerable<string> permissions)
     {
         var expiresAt = DateTime.UtcNow.AddMinutes(_options.SessionMinutes);
 
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, userId.ToString()),
-            new(JwtRegisteredClaimNames.Email, email),
+            new(JwtRegisteredClaimNames.UniqueName, username),
             new(JwtRegisteredClaimNames.Name, fullName),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
         };

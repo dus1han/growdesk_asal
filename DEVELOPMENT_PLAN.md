@@ -24,7 +24,7 @@ The CRM is built in **8 milestones**. Each one ends with both apps building, mig
 | Database | PostgreSQL 18, database `growdesk_asal`, bound to `127.0.0.1:5440` on the VPS only |
 | App URL | `http://169.58.92.105:3110` (plain HTTP until a domain + Caddy TLS) |
 | Dev database access | SSH tunnel: `ssh -N -L 5440:127.0.0.1:5440 deploy@169.58.92.105` |
-| Dev admin login | `admin@growdesk.local` (password in `backend/DoctorCrm.Api/appsettings.Development.json`) |
+| Dev admin login | username `Dev_Admin` (accounts sign in with a username, not an email) |
 
 **Development uses the VPS database.** It must be cleared (drop and re-seed) before go-live.
 

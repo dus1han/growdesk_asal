@@ -1,11 +1,12 @@
 namespace DoctorCrm.Api.DTOs;
 
-public record LoginRequest(string Email, string Password);
+public record LoginRequest(string Username, string Password);
 
 public record CurrentUserDto(
     int Id,
     string FullName,
-    string Email,
+    string Username,
+    string? Email,
     IReadOnlyList<string> Roles,
     IReadOnlyList<string> Permissions);
 

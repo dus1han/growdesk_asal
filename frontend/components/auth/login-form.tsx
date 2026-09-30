@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
-import { ArrowRight, Check, LockKeyhole, Mail, TriangleAlert } from "lucide-react";
+import { ArrowRight, Check, LockKeyhole, TriangleAlert, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -12,7 +12,7 @@ import { useLogin } from "@/lib/auth/session";
 import { LoginField } from "./login-field";
 
 const schema = z.object({
-  email: z.string().trim().min(1, "Please enter your email.").email("Please enter a valid email address."),
+  username: z.string().trim().min(1, "Please enter your username.").max(50, "Usernames are at most 50 characters."),
   password: z.string().min(1, "Please enter your password."),
 });
 type FormValues = z.infer<typeof schema>;
@@ -38,7 +38,7 @@ export function LoginForm({ next, onSuccess }: { next: string; onSuccess: () => 
     handleSubmit,
     setError,
     formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { username: "", password: "" } });
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
@@ -53,7 +53,7 @@ export function LoginForm({ next, onSuccess }: { next: string; onSuccess: () => 
       setPhase("idle");
       if (error instanceof ApiError && error.fieldErrors.length > 0) {
         for (const fe of error.fieldErrors) {
-          if (fe.field === "email" || fe.field === "password") setError(fe.field, { message: fe.message });
+          if (fe.field === "username" || fe.field === "password") setError(fe.field, { message: fe.message });
         }
       }
       setFormError(error instanceof ApiError ? error.message : "Something went wrong. Please try again.");
@@ -73,16 +73,19 @@ export function LoginForm({ next, onSuccess }: { next: string; onSuccess: () => 
       <form onSubmit={onSubmit} noValidate className="space-y-5">
         <motion.div {...stagger(0)}>
           <LoginField
-            id="email"
-            label="Email"
-            icon={Mail}
-            type="email"
+            id="username"
+            label="Username"
+            icon={UserRound}
+            type="text"
             autoComplete="username"
-            placeholder="you@clinic.com"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="Your username"
             autoFocus
             disabled={busy}
-            error={errors.email?.message}
-            {...register("email")}
+            error={errors.username?.message}
+            {...register("username")}
           />
         </motion.div>
 

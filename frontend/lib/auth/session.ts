@@ -27,7 +27,7 @@ export function useSession() {
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { email: string; password: string }) =>
+    mutationFn: (input: { username: string; password: string }) =>
       api.post<Session>("/auth/login", input, { skipUnauthorizedEvent: true }),
     onSuccess: (session) => queryClient.setQueryData(sessionQueryKey, session),
   });

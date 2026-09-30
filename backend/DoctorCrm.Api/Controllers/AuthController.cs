@@ -23,7 +23,7 @@ public class AuthController(AuthService auth, IOptions<AuthCookieOptions> cookie
     {
         var result = await auth.LoginAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
         if (result is null)
-            return Unauthorized(ApiResponse.Fail("Invalid email or password."));
+            return Unauthorized(ApiResponse.Fail("Invalid username or password."));
 
         Response.Cookies.Append(_cookie.Name, result.Token, new CookieOptions
         {

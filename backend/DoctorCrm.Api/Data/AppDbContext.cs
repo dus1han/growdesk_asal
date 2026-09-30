@@ -20,8 +20,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<User>(e =>
         {
             e.Property(x => x.FullName).HasMaxLength(150).IsRequired();
-            e.Property(x => x.Email).HasMaxLength(254).IsRequired();
-            e.HasIndex(x => x.Email).IsUnique();
+            e.Property(x => x.Username).HasMaxLength(50).IsRequired();
+            e.Property(x => x.NormalizedUsername).HasMaxLength(50).IsRequired();
+            e.HasIndex(x => x.NormalizedUsername).IsUnique();
+            e.Property(x => x.Email).HasMaxLength(254);
             e.Property(x => x.PasswordHash).HasMaxLength(100).IsRequired();
         });
 

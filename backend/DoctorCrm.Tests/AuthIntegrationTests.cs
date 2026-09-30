@@ -13,7 +13,7 @@ namespace DoctorCrm.Tests;
 /// <summary>Runs the real API against a throwaway PostgreSQL container.</summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    public const string AdminEmail = "admin@test.local";
+    public const string AdminUsername = "Test_Admin";
     public const string AdminPassword = "Test-Password-123";
 
     private readonly PostgreSqlContainer _db = new PostgreSqlBuilder("postgres:18").Build();
@@ -32,7 +32,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:DefaultConnection", _db.GetConnectionString());
         builder.UseSetting("Jwt:Key", new string('k', 48));
         builder.UseSetting("AuthCookie:Secure", "false");
-        builder.UseSetting("Seed:AdminEmail", AdminEmail);
+        builder.UseSetting("Seed:AdminUsername", AdminUsername);
         builder.UseSetting("Seed:AdminPassword", AdminPassword);
     }
 
@@ -62,20 +62,20 @@ public class AuthIntegrationTests(ApiFactory factory) : IClassFixture<ApiFactory
     public async Task Wrong_password_is_rejected_with_a_generic_message()
     {
         var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/login",
-            new LoginRequest(ApiFactory.AdminEmail, "wrong"));
+            new LoginRequest(ApiFactory.AdminUsername, "wrong"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<ApiResponse<object>>();
-        Assert.Equal("Invalid email or password.", body!.Message);
+        Assert.Equal("Invalid username or password.", body!.Message);
     }
 
     [Fact]
     public async Task Invalid_body_returns_field_errors()
     {
-        var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/login", new LoginRequest("nope", ""));
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/login", new LoginRequest("", ""));
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<ApiResponse<object>>();
-        Assert.Contains(body!.Errors!, e => e.Field == "email");
+        Assert.Contains(body!.Errors!, e => e.Field == "username");
         Assert.Contains(body.Errors!, e => e.Field == "password");
     }
 
@@ -84,14 +84,15 @@ public class AuthIntegrationTests(ApiFactory factory) : IClassFixture<ApiFactory
     {
         var client = factory.CreateCookieClient();
 
-        // Email is matched case-insensitively.
+        // Usernames are matched case-insensitively.
         var login = await client.PostAsJsonAsync("/api/auth/login",
-            new LoginRequest(ApiFactory.AdminEmail.ToUpperInvariant(), ApiFactory.AdminPassword));
+            new LoginRequest(ApiFactory.AdminUsername.ToLowerInvariant(), ApiFactory.AdminPassword));
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         Assert.Contains(login.Headers.GetValues("Set-Cookie"), c => c.Contains("httponly", StringComparison.OrdinalIgnoreCase));
 
         var me = await client.GetFromJsonAsync<ApiResponse<SessionDto>>("/api/auth/me");
-        Assert.Equal(ApiFactory.AdminEmail, me!.Data!.User.Email);
+        Assert.Equal(ApiFactory.AdminUsername, me!.Data!.User.Username);
+        Assert.Null(me.Data.User.Email);
         Assert.Contains("Admin", me.Data.User.Roles);
         Assert.Contains("admin.access", me.Data.User.Permissions);
 
@@ -109,7 +110,8 @@ public class AuthIntegrationTests(ApiFactory factory) : IClassFixture<ApiFactory
             db.Users.Add(new DoctorCrm.Api.Entities.User
             {
                 FullName = "Temp User",
-                Email = "temp@test.local",
+                Username = "Temp_User",
+                NormalizedUsername = "TEMP_USER",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("Temp-Password-1", 4),
                 UserRoles = { new DoctorCrm.Api.Entities.UserRole { RoleId = staffRoleId } },
             });
@@ -117,19 +119,19 @@ public class AuthIntegrationTests(ApiFactory factory) : IClassFixture<ApiFactory
         }
 
         var client = factory.CreateCookieClient();
-        var login = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("temp@test.local", "Temp-Password-1"));
+        var login = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("Temp_User", "Temp-Password-1"));
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
 
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var temp = await db.Users.SingleAsync(u => u.Email == "temp@test.local");
+            var temp = await db.Users.SingleAsync(u => u.Username == "Temp_User");
             temp.IsActive = false;
             await db.SaveChangesAsync();
         }
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
-        var again = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("temp@test.local", "Temp-Password-1"));
+        var again = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("Temp_User", "Temp-Password-1"));
         Assert.Equal(HttpStatusCode.Unauthorized, again.StatusCode);
     }
 

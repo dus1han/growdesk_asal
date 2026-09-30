@@ -10,20 +10,20 @@ public record LoginResult(string Token, SessionDto Session);
 
 public class AuthService(AppDbContext db, TokenService tokens, AuditService audit)
 {
-    // Verified against when the email is unknown, so a missing account takes as long as a wrong password.
+    // Verified against when the username is unknown, so a missing account takes as long as a wrong password.
     private static readonly string DummyHash = BCrypt.Net.BCrypt.HashPassword("dummy-password-for-timing", workFactor: 12);
 
     /// <summary>Returns null for any failure. The caller shows one generic message, never which part was wrong.</summary>
     public async Task<LoginResult?> LoginAsync(LoginRequest request, string? ipAddress, CancellationToken ct)
     {
-        var email = request.Email.Trim().ToLowerInvariant();
-        var user = await db.Users.SingleOrDefaultAsync(u => u.Email == email, ct);
+        var normalized = NormalizeUsername(request.Username);
+        var user = await db.Users.SingleOrDefaultAsync(u => u.NormalizedUsername == normalized, ct);
 
         var passwordOk = BCrypt.Net.BCrypt.Verify(request.Password, user?.PasswordHash ?? DummyHash);
         if (user is null || !passwordOk || !user.IsActive)
         {
             audit.Record(user?.Id, AuditActions.UserLoginFailed, nameof(User), user?.Id,
-                new { email, ipAddress, reason = user is null ? "unknown_email" : !passwordOk ? "bad_password" : "inactive" });
+                new { username = request.Username.Trim(), ipAddress, reason = user is null ? "unknown_username" : !passwordOk ? "bad_password" : "inactive" });
             await db.SaveChangesAsync(ct);
             return null;
         }
@@ -34,7 +34,7 @@ public class AuthService(AppDbContext db, TokenService tokens, AuditService audi
 
         var current = await GetCurrentUserAsync(user.Id, ct)
             ?? throw new InvalidOperationException("User vanished during login.");
-        var (token, expiresAt) = tokens.CreateToken(user.Id, user.Email, user.FullName, current.Roles, current.Permissions);
+        var (token, expiresAt) = tokens.CreateToken(user.Id, user.Username, user.FullName, current.Roles, current.Permissions);
 
         return new LoginResult(token, new SessionDto(current, expiresAt));
     }
@@ -50,6 +50,7 @@ public class AuthService(AppDbContext db, TokenService tokens, AuditService audi
             {
                 u.Id,
                 u.FullName,
+                u.Username,
                 u.Email,
                 Roles = u.UserRoles.Select(ur => ur.Role.Name).ToList(),
                 Permissions = u.UserRoles
@@ -62,8 +63,11 @@ public class AuthService(AppDbContext db, TokenService tokens, AuditService audi
 
         return user is null
             ? null
-            : new CurrentUserDto(user.Id, user.FullName, user.Email, user.Roles, user.Permissions.Order().ToList());
+            : new CurrentUserDto(user.Id, user.FullName, user.Username, user.Email, user.Roles, user.Permissions.Order().ToList());
     }
+
+    /// <summary>Usernames are unique regardless of case: "dev_admin" and "Dev_Admin" are the same account.</summary>
+    public static string NormalizeUsername(string username) => username.Trim().ToUpperInvariant();
 
     public async Task RecordLogoutAsync(int userId, CancellationToken ct)
     {

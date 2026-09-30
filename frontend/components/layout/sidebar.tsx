@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronsLeft, LogOut } from "lucide-react";
+import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "@/components/ui/logo";
@@ -36,9 +36,25 @@ export function Sidebar({ user, collapsed, onToggle, variant = "desktop", onNavi
       transition={spring}
       className="flex h-full flex-col border-r border-line bg-surface"
     >
-      {/* Brand */}
-      <div className={cn("flex h-16 items-center gap-3 px-5", isCollapsed && "justify-center px-0")}>
-        <LogoMark className="size-9 shrink-0" />
+      {/* Brand + collapse control */}
+      <div className={cn("flex h-16 items-center gap-3 pl-5 pr-3", isCollapsed && "justify-center px-0")}>
+        {isCollapsed && onToggle ? (
+          // Collapsed: the logo doubles as the expand button and shows the panel icon on hover.
+          <button
+            onClick={onToggle}
+            aria-label="Expand sidebar"
+            aria-expanded={false}
+            title="Expand sidebar"
+            className="group/expand relative flex size-9 items-center justify-center rounded-xl"
+          >
+            <LogoMark className="size-9 transition-opacity duration-150 group-hover/expand:opacity-0 group-focus-visible/expand:opacity-0" />
+            <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-surface-muted text-foreground opacity-0 transition-opacity duration-150 group-hover/expand:opacity-100 group-focus-visible/expand:opacity-100">
+              <PanelLeftOpen className="size-[18px]" />
+            </span>
+          </button>
+        ) : (
+          <LogoMark className="size-9 shrink-0" />
+        )}
         <AnimatePresence initial={false}>
           {!isCollapsed && (
             <motion.div
@@ -46,9 +62,20 @@ export function Sidebar({ user, collapsed, onToggle, variant = "desktop", onNavi
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -6 }}
               transition={{ duration: 0.15 }}
-              className="min-w-0"
+              className="flex min-w-0 flex-1 items-center justify-between gap-2"
             >
               <p className="truncate font-display text-[17px] font-bold tracking-tight">{branding?.crmName ?? "GrowDesk"}</p>
+              {variant === "desktop" && onToggle && (
+                <button
+                  onClick={onToggle}
+                  aria-label="Collapse sidebar"
+                  aria-expanded
+                  title="Collapse sidebar"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+                >
+                  <PanelLeftClose className="size-[18px]" />
+                </button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -74,26 +101,6 @@ export function Sidebar({ user, collapsed, onToggle, variant = "desktop", onNavi
           </div>
         )}
       </nav>
-
-      {/* Collapse control */}
-      {variant === "desktop" && onToggle && (
-        <div className="px-3 pb-2">
-          <button
-            onClick={onToggle}
-            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-expanded={!isCollapsed}
-            className={cn(
-              "flex h-9 w-full items-center gap-3 rounded-xl px-3 text-sm text-muted transition-colors hover:bg-surface-muted hover:text-foreground",
-              isCollapsed && "justify-center px-0",
-            )}
-          >
-            <motion.span animate={{ rotate: isCollapsed ? 180 : 0 }} transition={spring}>
-              <ChevronsLeft className="size-[18px]" />
-            </motion.span>
-            {!isCollapsed && <span>Collapse</span>}
-          </button>
-        </div>
-      )}
 
       {/* User */}
       <div className="border-t border-line p-3">

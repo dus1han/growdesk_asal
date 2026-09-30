@@ -11,7 +11,7 @@ const ease = [0.22, 1, 0.36, 1] as const;
  */
 export function LoginVisual() {
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[440px]" aria-hidden>
+    <div className="relative aspect-square h-full max-h-[440px] max-w-full" aria-hidden>
       {/* Core glow */}
       <motion.div
         className="absolute inset-[30%] rounded-full bg-[radial-gradient(circle,rgb(124_124_255/0.9),rgb(91_91_246/0.25)_55%,transparent_70%)] blur-md"

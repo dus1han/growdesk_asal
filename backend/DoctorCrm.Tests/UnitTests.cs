@@ -12,18 +12,18 @@ public class LoginRequestValidatorTests
     private readonly LoginRequestValidator _validator = new();
 
     [Theory]
-    [InlineData("", "secret", "email")]
-    [InlineData("not-an-email", "secret", "email")]
-    [InlineData("admin@growdesk.local", "", "password")]
-    public void Rejects_invalid_input(string email, string password, string field)
+    [InlineData("", "secret", "username")]
+    [InlineData("   ", "secret", "username")]
+    [InlineData("Dev_Admin", "", "password")]
+    public void Rejects_invalid_input(string username, string password, string field)
     {
-        var result = _validator.Validate(new LoginRequest(email, password));
+        var result = _validator.Validate(new LoginRequest(username, password));
         Assert.Contains(result.Errors, e => e.PropertyName.Equals(field, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
     public void Accepts_valid_input() =>
-        Assert.True(_validator.Validate(new LoginRequest("admin@growdesk.local", "secret")).IsValid);
+        Assert.True(_validator.Validate(new LoginRequest("Dev_Admin", "secret")).IsValid);
 }
 
 public class PermissionTests

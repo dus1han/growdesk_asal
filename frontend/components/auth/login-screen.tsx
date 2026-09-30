@@ -31,7 +31,7 @@ export function LoginScreen() {
       <LoginBackdrop />
 
       {/* Brand panel (desktop) */}
-      <section className="relative hidden flex-1 flex-col justify-between p-12 lg:flex xl:p-16">
+      <section className="relative hidden h-dvh flex-1 flex-col justify-between p-12 lg:flex xl:p-16 [@media(max-height:820px)]:p-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -40,7 +40,7 @@ export function LoginScreen() {
           <BrandLogo name={name} logoUrl={branding?.logoUrl} className="text-white" />
         </motion.div>
 
-        <div className="flex flex-1 items-center justify-center py-8">
+        <div className="flex min-h-0 flex-1 items-center justify-center py-6 [@media(max-height:820px)]:py-3">
           <LoginVisual />
         </div>
 
@@ -50,19 +50,19 @@ export function LoginScreen() {
           transition={{ duration: 0.8, delay: 0.35, ease }}
           className="max-w-md"
         >
-          <h1 className="font-display text-4xl font-bold leading-[1.1] tracking-tight xl:text-5xl">
+          <h1 className="text-balance font-display text-4xl font-bold leading-[1.1] tracking-tight xl:text-5xl [@media(max-height:820px)]:text-4xl">
             Care that{" "}
             <span className="bg-gradient-to-r from-[#a5a5ff] via-[#8b8bff] to-accent bg-clip-text text-transparent">
               grows
             </span>{" "}
             with every visit.
           </h1>
-          {tagline && <p className="mt-4 text-base text-white/60">{tagline}</p>}
+          {tagline && <p className="mt-4 text-base text-white/60 [@media(max-height:820px)]:mt-2">{tagline}</p>}
         </motion.div>
       </section>
 
       {/* Sign-in panel */}
-      <section className="relative flex w-full items-center justify-center px-4 py-10 sm:px-6 lg:w-[520px] lg:shrink-0 lg:px-12 xl:w-[580px]">
+      <section className="relative flex w-full items-center justify-center px-4 py-10 [@media(max-height:700px)]:py-5 sm:px-6 lg:w-[520px] lg:shrink-0 lg:px-12 xl:w-[580px]">
         <motion.div
           initial={{ opacity: 0, y: 28, scale: 0.97 }}
           animate={leaving ? { opacity: 0, y: -12, scale: 0.97 } : { opacity: 1, y: 0, scale: 1 }}
@@ -74,14 +74,14 @@ export function LoginScreen() {
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease }}
-            className="mb-8 flex flex-col items-center text-center lg:hidden"
+            className="mb-8 flex flex-col items-center text-center lg:hidden [@media(max-height:700px)]:mb-5"
           >
-            <LogoMark className="size-14" />
-            <p className="mt-3 font-display text-2xl font-bold tracking-tight">{name}</p>
-            {tagline && <p className="mt-1 text-sm text-white/55">{tagline}</p>}
+            <LogoMark className="size-14 [@media(max-height:700px)]:size-11" />
+            <p className="mt-3 font-display text-2xl font-bold tracking-tight [@media(max-height:700px)]:mt-2">{name}</p>
+            {tagline && <p className="mt-1 text-sm text-white/55 [@media(max-height:700px)]:hidden">{tagline}</p>}
           </motion.div>
 
-          <div className="relative rounded-3xl border border-white/10 bg-white/[0.045] p-7 shadow-[0_30px_80px_-20px_rgb(0_0_0/0.6)] backdrop-blur-2xl sm:p-9">
+          <div className="relative rounded-3xl border border-white/10 bg-white/[0.045] p-7 [@media(max-height:700px)]:p-6 shadow-[0_30px_80px_-20px_rgb(0_0_0/0.6)] backdrop-blur-2xl sm:p-9">
             {/* Top edge highlight */}
             <div className="absolute inset-x-8 -top-px h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" aria-hidden />
 
@@ -89,7 +89,7 @@ export function LoginScreen() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4, ease }}
-              className="mb-8"
+              className="mb-8 [@media(max-height:700px)]:mb-6"
             >
               <h2 className="font-display text-[28px] font-bold tracking-tight">Welcome back</h2>
               <p className="mt-1.5 text-sm text-white/55">Sign in to continue to {name}.</p>
@@ -102,7 +102,7 @@ export function LoginScreen() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.1, duration: 0.6 }}
-            className="mt-6 text-center text-xs text-white/35"
+            className="mt-6 text-center text-xs text-white/35 [@media(max-height:700px)]:mt-4"
           >
             Trouble signing in? Ask your administrator to reset your password.
           </motion.p>

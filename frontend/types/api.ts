@@ -14,7 +14,8 @@ export interface ApiFieldError {
 export interface CurrentUser {
   id: number;
   fullName: string;
-  email: string;
+  username: string;
+  email: string | null;
   roles: string[];
   permissions: string[];
 }
