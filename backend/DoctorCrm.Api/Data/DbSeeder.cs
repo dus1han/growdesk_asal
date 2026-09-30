@@ -1,0 +1,135 @@
+using DoctorCrm.Api.Authorization;
+using DoctorCrm.Api.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace DoctorCrm.Api.Data;
+
+/// <summary>
+/// Idempotent seed data: roles, permissions, default stages, starter treatments, settings and
+/// the first admin. Safe to run on every start: it only adds what is missing and never
+/// overwrites values an admin has changed.
+/// </summary>
+public class DbSeeder(AppDbContext db, IConfiguration config, ILogger<DbSeeder> logger)
+{
+    public async Task SeedAsync(CancellationToken ct = default)
+    {
+        await SeedPermissionsAndRolesAsync(ct);
+        await SeedStagesAsync(ct);
+        await SeedTreatmentsAsync(ct);
+        await SeedSettingsAsync(ct);
+        await SeedAdminAsync(ct);
+    }
+
+    private async Task SeedPermissionsAndRolesAsync(CancellationToken ct)
+    {
+        var perms = await db.Permissions.ToDictionaryAsync(p => p.Key, ct);
+        foreach (var (key, description) in Permissions.Descriptions)
+        {
+            if (perms.ContainsKey(key)) continue;
+            var p = new Permission { Key = key, Description = description };
+            db.Permissions.Add(p);
+            perms[key] = p;
+        }
+
+        var roles = await db.Roles.Include(r => r.RolePermissions).ToDictionaryAsync(r => r.Name, ct);
+        foreach (var (roleName, permKeys) in Roles.DefaultPermissions)
+        {
+            // Only a brand-new role gets its default set, so later admin edits survive restarts.
+            if (roles.ContainsKey(roleName)) continue;
+
+            var role = new Role { Name = roleName };
+            foreach (var key in permKeys)
+                role.RolePermissions.Add(new RolePermission { Permission = perms[key] });
+            db.Roles.Add(role);
+        }
+
+        // Admin always holds every permission, including ones added in later releases.
+        if (roles.TryGetValue(Roles.Admin, out var admin))
+        {
+            var held = admin.RolePermissions.Select(rp => rp.PermissionId).ToHashSet();
+            foreach (var p in perms.Values.Where(p => p.Id == 0 || !held.Contains(p.Id)))
+                admin.RolePermissions.Add(new RolePermission { Permission = p });
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task SeedStagesAsync(CancellationToken ct)
+    {
+        if (await db.Stages.AnyAsync(ct)) return;
+
+        (string Name, string Key, string Color)[] defaults =
+        [
+            ("Interested", StageKeys.Interested, "#6366F1"),
+            ("Follow-up", StageKeys.FollowUp, "#F59E0B"),
+            ("Booked", StageKeys.Booked, "#0EA5E9"),
+            ("Consultation Completed", StageKeys.ConsultationCompleted, "#14B8A6"),
+            ("Treatment Started", StageKeys.TreatmentStarted, "#8B5CF6"),
+            ("Completed", StageKeys.Completed, "#22C55E"),
+            ("Lost", StageKeys.Lost, "#94A3B8"),
+        ];
+
+        for (var i = 0; i < defaults.Length; i++)
+        {
+            var (name, key, color) = defaults[i];
+            db.Stages.Add(new Stage { Name = name, SystemKey = key, Color = color, DisplayOrder = i + 1 });
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task SeedTreatmentsAsync(CancellationToken ct)
+    {
+        if (await db.Treatments.AnyAsync(ct)) return;
+
+        string[] names = ["Botox", "Dermal Filler", "Hair Treatment", "Skin Treatment", "Laser"];
+        for (var i = 0; i < names.Length; i++)
+            db.Treatments.Add(new Treatment { Name = names[i], DisplayOrder = i + 1 });
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task SeedSettingsAsync(CancellationToken ct)
+    {
+        var defaults = new Dictionary<string, string>
+        {
+            [SettingKeys.CrmName] = "GrowDesk",
+            [SettingKeys.Tagline] = "Every patient relationship, beautifully organised.",
+            [SettingKeys.LogoUrl] = "",
+            [SettingKeys.Currency] = "AED",
+            [SettingKeys.TimeZone] = "Asia/Dubai",
+        };
+
+        var existing = await db.SystemSettings.Select(s => s.Key).ToListAsync(ct);
+        foreach (var (key, value) in defaults.Where(d => !existing.Contains(d.Key)))
+            db.SystemSettings.Add(new SystemSetting { Key = key, Value = value, UpdatedAt = DateTime.UtcNow });
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task SeedAdminAsync(CancellationToken ct)
+    {
+        if (await db.Users.AnyAsync(ct)) return;
+
+        var email = config["Seed:AdminEmail"]?.Trim().ToLowerInvariant();
+        var password = config["Seed:AdminPassword"];
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            logger.LogWarning("No users exist and Seed:AdminEmail / Seed:AdminPassword are not set, so nobody can log in yet.");
+            return;
+        }
+
+        var adminRole = await db.Roles.SingleAsync(r => r.Name == Roles.Admin, ct);
+        var user = new User
+        {
+            FullName = config["Seed:AdminName"] ?? "Administrator",
+            Email = email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
+        };
+        user.UserRoles.Add(new UserRole { Role = adminRole });
+        db.Users.Add(user);
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("Seeded first admin user {Email}", email);
+    }
+}

@@ -1,0 +1,76 @@
+# GrowDesk stack on the VPS, at /home/deploy/sites/growdesk_asal.
+#
+# Shipped to the server by .github/workflows/deploy.yml on every deploy, so changes here always
+# arrive. The server's .env (never in git) holds the passwords, keys, image names and ports.
+#
+# Only the web container publishes a port. The API and database are reachable solely on this
+# stack's private network ("api", "db"); the database additionally binds 127.0.0.1:${DB_PORT} so
+# development machines can reach it through an SSH tunnel:
+#   ssh -N -L 5440:127.0.0.1:5440 deploy@<vps>
+#
+# WEB_BIND follows the landing pages' BIND_ADDR convention: 0.0.0.0 while GrowDesk is served on
+# ip:port, 127.0.0.1 once a domain points here and Caddy fronts it with TLS.
+
+services:
+  db:
+    image: postgres:18
+    container_name: growdesk_asal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: Asia/Dubai
+    ports:
+      - '127.0.0.1:${DB_PORT}:5432'
+    volumes:
+      - growdesk_asal_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  api:
+    image: ${API_IMAGE}
+    container_name: growdesk_asal-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Jwt__Key: ${JWT_KEY}
+      # Plain HTTP on ip:port: a Secure cookie would be dropped by the browser. Set true behind TLS.
+      AuthCookie__Secure: ${COOKIE_SECURE:-false}
+      Seed__AdminEmail: ${SEED_ADMIN_EMAIL:-}
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:-}
+    logging: *logging
+
+  web:
+    image: ${WEB_IMAGE}
+    container_name: growdesk_asal-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '${WEB_BIND:-127.0.0.1}:${WEB_PORT}:3000'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    logging: *logging
+
+volumes:
+  growdesk_asal_pgdata:

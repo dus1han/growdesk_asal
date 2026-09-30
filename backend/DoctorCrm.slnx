@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="DoctorCrm.Api/DoctorCrm.Api.csproj" />
+  <Project Path="DoctorCrm.Tests/DoctorCrm.Tests.csproj" />
+</Solution>

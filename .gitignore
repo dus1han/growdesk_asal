@@ -1,0 +1,25 @@
+# .NET
+bin/
+obj/
+*.user
+appsettings.Development.json
+appsettings.Local.json
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# Tools
+.vs/
+.idea/
+.claude/settings.local.json
+playwright-report/
+test-results/

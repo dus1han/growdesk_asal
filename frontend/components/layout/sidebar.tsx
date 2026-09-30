@@ -1,0 +1,183 @@
+"use client";
+
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronsLeft, LogOut } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { LogoMark } from "@/components/ui/logo";
+import { useBranding, useLogout } from "@/lib/auth/session";
+import { can } from "@/lib/permissions";
+import { cn, initials } from "@/lib/utils";
+import type { CurrentUser } from "@/types/api";
+import { mainNav, managementNav, type NavItem } from "./nav-items";
+
+const spring = { type: "spring", stiffness: 380, damping: 34 } as const;
+
+interface SidebarProps {
+  user: CurrentUser;
+  collapsed: boolean;
+  onToggle?: () => void;
+  /** Rendered inside the mobile drawer: always expanded, no collapse control. */
+  variant?: "desktop" | "drawer";
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ user, collapsed, onToggle, variant = "desktop", onNavigate }: SidebarProps) {
+  const { data: branding } = useBranding();
+  const logout = useLogout();
+  const isCollapsed = variant === "desktop" && collapsed;
+  const main = mainNav.filter((i) => can(user, i.permission));
+  const management = managementNav.filter((i) => can(user, i.permission));
+
+  return (
+    <motion.aside
+      initial={false}
+      animate={{ width: variant === "drawer" ? 280 : isCollapsed ? 76 : 260 }}
+      transition={spring}
+      className="flex h-full flex-col border-r border-line bg-surface"
+    >
+      {/* Brand */}
+      <div className={cn("flex h-16 items-center gap-3 px-5", isCollapsed && "justify-center px-0")}>
+        <LogoMark className="size-9 shrink-0" />
+        <AnimatePresence initial={false}>
+          {!isCollapsed && (
+            <motion.div
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -6 }}
+              transition={{ duration: 0.15 }}
+              className="min-w-0"
+            >
+              <p className="truncate font-display text-[17px] font-bold tracking-tight">{branding?.crmName ?? "GrowDesk"}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Navigation */}
+      {/* Collapsed: overflow must stay visible or the hover tooltips are clipped. */}
+      <nav
+        className={cn("flex-1 space-y-6 px-3 py-4", isCollapsed ? "overflow-visible" : "overflow-y-auto overflow-x-hidden")}
+        aria-label="Main"
+      >
+        <NavGroup items={main} collapsed={isCollapsed} onNavigate={onNavigate} layoutGroup={variant} />
+        {management.length > 0 && (
+          <div>
+            <div className="mb-2 h-4 px-3">
+              {!isCollapsed ? (
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted/70">Management</p>
+              ) : (
+                <div className="mx-auto h-px w-6 translate-y-2 bg-line" />
+              )}
+            </div>
+            <NavGroup items={management} collapsed={isCollapsed} onNavigate={onNavigate} layoutGroup={variant} />
+          </div>
+        )}
+      </nav>
+
+      {/* Collapse control */}
+      {variant === "desktop" && onToggle && (
+        <div className="px-3 pb-2">
+          <button
+            onClick={onToggle}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!isCollapsed}
+            className={cn(
+              "flex h-9 w-full items-center gap-3 rounded-xl px-3 text-sm text-muted transition-colors hover:bg-surface-muted hover:text-foreground",
+              isCollapsed && "justify-center px-0",
+            )}
+          >
+            <motion.span animate={{ rotate: isCollapsed ? 180 : 0 }} transition={spring}>
+              <ChevronsLeft className="size-[18px]" />
+            </motion.span>
+            {!isCollapsed && <span>Collapse</span>}
+          </button>
+        </div>
+      )}
+
+      {/* User */}
+      <div className="border-t border-line p-3">
+        <div className={cn("flex items-center gap-3 rounded-xl p-2", isCollapsed && "flex-col gap-2 p-1")}>
+          <div
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-accent text-xs font-bold text-white"
+            title={isCollapsed ? `${user.fullName} · ${user.roles.join(", ")}` : undefined}
+          >
+            {initials(user.fullName)}
+          </div>
+          {!isCollapsed && (
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{user.fullName}</p>
+              <p className="truncate text-xs text-muted">{user.roles.join(", ")}</p>
+            </div>
+          )}
+          <button
+            onClick={() => logout.mutate()}
+            disabled={logout.isPending}
+            aria-label="Sign out"
+            title="Sign out"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-danger"
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
+      </div>
+    </motion.aside>
+  );
+}
+
+function NavGroup({
+  items,
+  collapsed,
+  onNavigate,
+  layoutGroup,
+}: {
+  items: NavItem[];
+  collapsed: boolean;
+  onNavigate?: () => void;
+  layoutGroup: string;
+}) {
+  const pathname = usePathname();
+
+  return (
+    <ul className="space-y-1">
+      {items.map(({ href, label, icon: Icon }) => {
+        const active = pathname === href || pathname.startsWith(`${href}/`);
+        return (
+          <li key={href} className="group relative">
+            <Link
+              href={href}
+              onClick={onNavigate}
+              aria-current={active ? "page" : undefined}
+              aria-label={collapsed ? label : undefined}
+              className={cn(
+                "relative flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
+                active ? "text-brand-strong" : "text-muted hover:bg-surface-muted hover:text-foreground",
+                collapsed && "justify-center px-0",
+              )}
+            >
+              {active && (
+                <motion.span
+                  layoutId={`nav-active-${layoutGroup}`}
+                  className="absolute inset-0 rounded-xl bg-brand-soft"
+                  transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                />
+              )}
+              <Icon className="relative size-[18px] shrink-0" />
+              {!collapsed && <span className="relative truncate">{label}</span>}
+            </Link>
+
+            {/* Tooltip when collapsed */}
+            {collapsed && (
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-x-1 -translate-y-1/2 whitespace-nowrap rounded-lg bg-foreground px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-pop transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100"
+              >
+                {label}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
