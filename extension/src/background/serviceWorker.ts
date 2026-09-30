@@ -49,7 +49,7 @@ async function restoreMenus(): Promise<void> {
 
 chrome.runtime.onInstalled.addListener((details) => {
   void restoreMenus();
-  // Updated from the toolbar's Reload: reopen the capture tabs so they run the new version.
+  // Updated from the toolbar's Reload: refresh the WhatsApp / Instagram tabs that are already open (it never opens new ones) so they run the new version.
   if (details.reason === 'update') {
     void chrome.storage.local.get(RELOAD_TABS_KEY).then(async (stored) => {
       if (!stored[RELOAD_TABS_KEY]) return;
@@ -138,8 +138,8 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendRespo
     return false;
   }
   if (message.type === 'GD_RELOAD_EXTENSION') {
-    // After the new files were unzipped over the old ones: reload from disk, then reopen the
-    // WhatsApp / Instagram tabs so they get the new toolbar (see onInstalled).
+    // After the new files were unzipped over the old ones: reload from disk, then refresh the
+    // already-open WhatsApp / Instagram tabs so they get the new toolbar (see onInstalled).
     void chrome.storage.local.set({ [RELOAD_TABS_KEY]: true }).then(() => chrome.runtime.reload());
     sendResponse({ ok: true });
     return false;
