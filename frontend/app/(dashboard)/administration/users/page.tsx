@@ -254,16 +254,16 @@ function UserDrawer({ user, onClose }: { user: AdminUser | "new" | null; onClose
       }
     >
       <form id="user-form" onSubmit={onSubmit} className="space-y-5" noValidate>
-        <Field label="Full name" error={errors.fullName?.message}>
+        <Field label="Full name" required error={errors.fullName?.message}>
           {(p) => <Input {...p} autoFocus autoComplete="off" {...register("fullName")} />}
         </Field>
-        <Field label="Username" hint="Used to sign in. Not case-sensitive." error={errors.username?.message}>
+        <Field label="Username" required hint="Used to sign in. Not case-sensitive." error={errors.username?.message}>
           {(p) => <Input {...p} autoComplete="off" autoCapitalize="none" spellCheck={false} {...register("username")} />}
         </Field>
         <Field label="Email" optional error={errors.email?.message}>
           {(p) => <Input {...p} type="email" autoComplete="off" {...register("email")} />}
         </Field>
-        <Field label="Role" hint="Decides what this person can see and do." error={errors.roleId?.message}>
+        <Field label="Role" required hint="Decides what this person can see and do." error={errors.roleId?.message}>
           {(p) => (
             <Select {...p} {...register("roleId", { valueAsNumber: true })}>
               <option value={0} disabled>
@@ -278,7 +278,7 @@ function UserDrawer({ user, onClose }: { user: AdminUser | "new" | null; onClose
           )}
         </Field>
         {!existing && (
-          <Field label="Password" hint="At least 8 characters, including a letter and a number." error={errors.password?.message}>
+          <Field label="Password" required hint="At least 8 characters, including a letter and a number." error={errors.password?.message}>
             {(p) => (
               <div className="relative">
                 <Input {...p} type={showPassword ? "text" : "password"} autoComplete="new-password" className="pr-11" {...register("password")} />
@@ -340,10 +340,10 @@ function ResetPasswordDrawer({ user, onClose }: { user: AdminUser | null; onClos
       }
     >
       <form id="reset-form" onSubmit={onSubmit} className="space-y-5" noValidate>
-        <Field label="New password" hint="At least 8 characters, including a letter and a number." error={errors.newPassword?.message}>
+        <Field label="New password" required hint="At least 8 characters, including a letter and a number." error={errors.newPassword?.message}>
           {(p) => <Input {...p} type="password" autoFocus autoComplete="new-password" {...register("newPassword")} />}
         </Field>
-        <Field label="Confirm new password" error={errors.confirm?.message}>
+        <Field label="Confirm new password" required error={errors.confirm?.message}>
           {(p) => <Input {...p} type="password" autoComplete="new-password" {...register("confirm")} />}
         </Field>
       </form>

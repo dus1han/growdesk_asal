@@ -263,7 +263,7 @@ function LookupDrawer({
       }
     >
       <form id="lookup-form" onSubmit={onSubmit} className="space-y-5" noValidate>
-        <Field label={`${Capitalised} name`} error={errors.name?.message}>
+        <Field label={`${Capitalised} name`} required error={errors.name?.message}>
           {(p) => <Input {...p} autoFocus autoComplete="off" {...register("name")} />}
         </Field>
 
@@ -274,7 +274,7 @@ function LookupDrawer({
         )}
 
         {withColor && (
-          <Field label="Colour" hint="Used for this stage's badges everywhere in the app." error={errors.color?.message}>
+          <Field label="Colour" required hint="Used for this stage's badges everywhere in the app." error={errors.color?.message}>
             {(p) => (
               <div>
                 <div className="grid grid-cols-6 gap-2" role="radiogroup" aria-label="Colour presets">

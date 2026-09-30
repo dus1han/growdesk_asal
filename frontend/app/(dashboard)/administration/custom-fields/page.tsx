@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Badge, Field, Input, Switch } from "@/components/ui/form-controls";
+import { Badge, Field, Input, RequiredMark, Switch } from "@/components/ui/form-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toastError, useCustomFieldMutations, useCustomFieldsAdmin } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
@@ -215,12 +215,15 @@ function FieldDrawer({ field, onClose }: { field: CustomField | "new" | null; on
       }
     >
       <form id="field-form" onSubmit={onSubmit} className="space-y-6" noValidate>
-        <Field label="Field name" hint="As staff will see it, e.g. Preferred Branch." error={errors.label?.message}>
+        <Field label="Field name" required hint="As staff will see it, e.g. Preferred Branch." error={errors.label?.message}>
           {(p) => <Input {...p} autoFocus autoComplete="off" {...register("label")} />}
         </Field>
 
         <fieldset>
-          <legend className="mb-1.5 text-[13px] font-medium">Type</legend>
+          <legend className="mb-1.5 text-[13px] font-medium">
+            Type
+            <RequiredMark />
+          </legend>
           {existing && <p className="mb-2 text-xs text-muted">The type can’t be changed after a field is created.</p>}
           <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Field type">
             {CUSTOM_FIELD_TYPES.map((t) => {
@@ -260,7 +263,10 @@ function FieldDrawer({ field, onClose }: { field: CustomField | "new" | null; on
               transition={{ duration: 0.2 }}
               className="overflow-hidden"
             >
-              <legend className="mb-1.5 text-[13px] font-medium">Options</legend>
+              <legend className="mb-1.5 text-[13px] font-medium">
+                Options
+                <RequiredMark />
+              </legend>
               {existing && <p className="mb-2 text-xs text-muted">Removed options stay on customers who already chose them.</p>}
               <ul className="space-y-2">
                 <AnimatePresence initial={false}>

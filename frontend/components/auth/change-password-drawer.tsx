@@ -70,10 +70,10 @@ function ChangePasswordForm({ onClose }: { onClose: () => void }) {
 
   return (
     <form id="change-password-form" onSubmit={onSubmit} className="space-y-5" noValidate>
-      <Field label="Current password" error={errors.currentPassword?.message}>
+      <Field label="Current password" required error={errors.currentPassword?.message}>
         {(p) => <Input {...p} type="password" autoComplete="current-password" autoFocus {...register("currentPassword")} />}
       </Field>
-      <Field label="New password" error={errors.newPassword?.message}>
+      <Field label="New password" required error={errors.newPassword?.message}>
         {(p) => (
           <div>
             <Input {...p} type="password" autoComplete="new-password" {...register("newPassword")} />
@@ -94,7 +94,7 @@ function ChangePasswordForm({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </Field>
-      <Field label="Confirm new password" error={errors.confirm?.message}>
+      <Field label="Confirm new password" required error={errors.confirm?.message}>
         {(p) => <Input {...p} type="password" autoComplete="new-password" {...register("confirm")} />}
       </Field>
     </form>

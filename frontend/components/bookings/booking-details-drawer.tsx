@@ -11,7 +11,7 @@ import { z } from "zod";
 import { StageBadge } from "@/components/customers/stage-badge";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
-import { Field, Input, Select, Textarea } from "@/components/ui/form-controls";
+import { Field, Input, RequiredMark, Select, Textarea } from "@/components/ui/form-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toastError } from "@/lib/api/admin";
 import { useBooking, useBookingActions, useDoctorOptions, useLocale } from "@/lib/api/bookings";
@@ -406,7 +406,7 @@ function CompleteForm({ booking, onDone }: { booking: BookingDetail; onDone: () 
         ))}
       </div>
 
-      <Field label="Consultation charge" error={errors.consultationCharge?.message}>
+      <Field label="Consultation charge" required error={errors.consultationCharge?.message}>
         {(p) => (
           <div className="relative">
             <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted">
@@ -418,7 +418,10 @@ function CompleteForm({ booking, onDone }: { booking: BookingDetail; onDone: () 
       </Field>
 
       <fieldset>
-        <legend className="mb-2 text-[13px] font-medium">Payment</legend>
+        <legend className="mb-2 text-[13px] font-medium">
+          Payment
+          <RequiredMark />
+        </legend>
         <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-muted p-1" role="radiogroup" aria-label="Payment status">
           {PAYMENT_STATUSES.map((s) => (
             <button
@@ -441,7 +444,7 @@ function CompleteForm({ booking, onDone }: { booking: BookingDetail; onDone: () 
       <AnimatePresence initial={false}>
         {status !== "Waived" && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <Field label="Payment method" optional={status === "Pending"} error={errors.paymentMethodId?.message}>
+            <Field label="Payment method" optional={status === "Pending"} required={status !== "Pending"} error={errors.paymentMethodId?.message}>
               {(p) => (
                 <Select {...p} {...register("paymentMethodId", { setValueAs: idOrNull })}>
                   <option value="">Choose…</option>
@@ -580,10 +583,10 @@ function RescheduleForm({ booking, onDone }: { booking: BookingDetail; onDone: (
         The current appointment is kept as <span className="font-semibold">Rescheduled</span> with no charge, and a new booking is created with the same treatments.
       </p>
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="New date" error={errors.date?.message}>
+        <Field label="New date" required error={errors.date?.message}>
           {(p) => <Input {...p} type="date" autoFocus {...register("date")} />}
         </Field>
-        <Field label="Start" error={errors.startTime?.message}>
+        <Field label="Start" required error={errors.startTime?.message}>
           {(p) => (
             <Input
               {...p}
@@ -601,7 +604,7 @@ function RescheduleForm({ booking, onDone }: { booking: BookingDetail; onDone: (
             />
           )}
         </Field>
-        <Field label="End" error={errors.endTime?.message}>
+        <Field label="End" required error={errors.endTime?.message}>
           {(p) => <Input {...p} type="time" step={900} {...register("endTime")} />}
         </Field>
       </div>
@@ -653,7 +656,7 @@ function CancelForm({ booking, onDone }: { booking: BookingDetail; onDone: () =>
   return (
     <form id="booking-cancel-form" onSubmit={onSubmit} className="space-y-5" noValidate>
       <p className="text-sm text-muted">The booking stays in the history with status Cancelled.</p>
-      <Field label="Reason" error={errors.cancellationReasonId?.message}>
+      <Field label="Reason" required error={errors.cancellationReasonId?.message}>
         {(p) => (
           <Select {...p} autoFocus {...register("cancellationReasonId", { setValueAs: idOrNull })}>
             <option value="">Choose a reason…</option>

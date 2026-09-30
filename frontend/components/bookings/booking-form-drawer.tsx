@@ -10,7 +10,7 @@ import { z } from "zod";
 import { StageBadge } from "@/components/customers/stage-badge";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
-import { Field, Input, Select, Textarea } from "@/components/ui/form-controls";
+import { Field, Input, RequiredMark, Select, Textarea } from "@/components/ui/form-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { toastError } from "@/lib/api/admin";
@@ -161,7 +161,10 @@ function BookingForm({
     <form id="booking-form" onSubmit={onSubmit} className="space-y-6" noValidate>
       {/* Customer */}
       <div>
-        <p className="mb-1.5 text-[13px] font-medium">Customer</p>
+        <p className="mb-1.5 text-[13px] font-medium">
+          Customer
+          <RequiredMark />
+        </p>
         {customer ? (
           <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-muted/50 px-3.5 py-2.5">
             <span className="text-sm font-semibold">{customer.name}</span>
@@ -204,10 +207,10 @@ function BookingForm({
       ) : (
         <div className="space-y-3">
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Date" error={errors.date?.message} className="sm:col-span-1">
+            <Field label="Date" required error={errors.date?.message} className="sm:col-span-1">
               {(p) => <Input {...p} type="date" {...register("date")} />}
             </Field>
-            <Field label="Start" error={errors.startTime?.message}>
+            <Field label="Start" required error={errors.startTime?.message}>
               {(p) => (
                 <Input
                   {...p}
@@ -223,7 +226,7 @@ function BookingForm({
                 />
               )}
             </Field>
-            <Field label="End" error={errors.endTime?.message}>
+            <Field label="End" required error={errors.endTime?.message}>
               {(p) => <Input {...p} type="time" step={900} {...register("endTime")} />}
             </Field>
           </div>
@@ -268,7 +271,8 @@ function BookingForm({
 
       <fieldset>
         <legend className="mb-2 text-[13px] font-medium">
-          Treatments<span className="ml-0.5 text-danger" aria-hidden>*</span>
+          Treatments
+          <RequiredMark />
         </legend>
         <div className="flex flex-wrap gap-2" aria-busy={treatments.isPending}>
           {treatments.isPending && [72, 96, 84, 110].map((w) => <Skeleton key={w} className="h-7 rounded-lg" style={{ width: w }} />)}

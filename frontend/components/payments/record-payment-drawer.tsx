@@ -84,7 +84,7 @@ function RecordPaymentForm({ pending, onClose }: { pending: PendingPayment; onCl
         <p className="text-xs font-semibold uppercase tracking-[0.06em] text-amber-700">Pending</p>
         <p className="mt-1 font-display text-2xl font-bold">{formatMoney(pending.amount, locale?.currency)}</p>
       </div>
-      <Field label="Payment method" error={errors.paymentMethodId?.message}>
+      <Field label="Payment method" required error={errors.paymentMethodId?.message}>
         {(p) => (
           <Select {...p} autoFocus {...register("paymentMethodId", { setValueAs: (v) => (v === "" ? null : Number(v)) })}>
             <option value="">Choose…</option>
@@ -96,7 +96,7 @@ function RecordPaymentForm({ pending, onClose }: { pending: PendingPayment; onCl
           </Select>
         )}
       </Field>
-      <Field label="Paid on" error={errors.paymentDate?.message}>
+      <Field label="Paid on" required error={errors.paymentDate?.message}>
         {(p) => <Input {...p} type="date" max={max} {...register("paymentDate")} />}
       </Field>
     </form>

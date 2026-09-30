@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
-import { Field, Input, Select, Switch, Textarea } from "@/components/ui/form-controls";
+import { Field, Input, RequiredMark, Select, Switch, Textarea } from "@/components/ui/form-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toastError } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
@@ -226,11 +226,11 @@ function CustomerForm({
       </AnimatePresence>
 
       <section className="space-y-4">
-        <Field label="Name" error={errors.name?.message}>
+        <Field label="Name" required error={errors.name?.message}>
           {(p) => <Input {...p} autoFocus autoComplete="off" {...register("name")} />}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="WhatsApp" hint="Any country, with its code (e.g. +94…). UAE numbers work without it." error={errors.whatsApp?.message}>
+          <Field label="WhatsApp" required hint="With its country code (e.g. +94…); UAE numbers work without it. For an Instagram-only lead, add the Instagram name under More details instead." error={errors.whatsApp?.message}>
             {(p) => <Input {...p} type="tel" inputMode="tel" placeholder="+971 50 123 4567" autoComplete="off" {...register("whatsApp")} />}
           </Field>
           <Field label="Lead source" optional error={errors.leadSourceId?.message}>
@@ -281,7 +281,8 @@ function CustomerForm({
 
       <fieldset>
         <legend className="mb-2 text-[13px] font-medium">
-          Interested treatments<span className="ml-0.5 text-danger" aria-hidden>*</span>
+          Interested treatments
+          <RequiredMark />
         </legend>
         {errors.treatmentIds?.message && <p className="-mt-1 mb-2 text-xs text-danger">{errors.treatmentIds.message}</p>}
         <div className="flex flex-wrap gap-2">
@@ -412,7 +413,10 @@ function CustomFieldInput({ field, control, error }: { field: CustomField; contr
           case "Boolean":
             return (
               <div className="flex items-center justify-between gap-4 rounded-xl border border-line px-4 py-3">
-                <span className="text-sm font-medium">{field.label}</span>
+                <span className="text-sm font-medium">
+                  {field.label}
+                  {field.isRequired && <RequiredMark />}
+                </span>
                 <Switch checked={v === true} onCheckedChange={onChange} label={field.label} />
               </div>
             );
@@ -420,7 +424,10 @@ function CustomFieldInput({ field, control, error }: { field: CustomField; contr
             const ids = Array.isArray(v) ? v : [];
             return (
               <fieldset>
-                <legend className="mb-2 text-[13px] font-medium">{field.label}</legend>
+                <legend className="mb-2 text-[13px] font-medium">
+                  {field.label}
+                  {field.isRequired && <RequiredMark />}
+                </legend>
                 <div className="flex flex-wrap gap-2">
                   {field.options.map((o) => {
                     const on = ids.includes(o.id);
@@ -446,7 +453,7 @@ function CustomFieldInput({ field, control, error }: { field: CustomField; contr
           }
           default:
             return (
-              <Field label={field.label} optional={!field.isRequired} error={error}>
+              <Field label={field.label} optional={!field.isRequired} required={field.isRequired} error={error}>
                 {(p) =>
                   field.fieldType === "Dropdown" ? (
                     <Select {...p} value={typeof v === "number" ? v : ""} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}>

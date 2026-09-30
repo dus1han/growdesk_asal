@@ -7,12 +7,22 @@ import { cn } from "@/lib/utils";
 const controlBase =
   "w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-foreground shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-[border-color,box-shadow] duration-150 placeholder:text-muted/60 hover:border-slate-300 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted aria-[invalid=true]:border-danger/60 aria-[invalid=true]:focus:ring-danger/15";
 
+/** The red asterisk every mandatory field shows next to its label. */
+export function RequiredMark() {
+  return (
+    <span className="ml-0.5 text-danger" aria-hidden>
+      *
+    </span>
+  );
+}
+
 /** Label, control, hint and animated error message, with the ARIA wiring done once. */
 export function Field({
   label,
   hint,
   error,
   optional,
+  required,
   children,
   className,
 }: {
@@ -20,7 +30,9 @@ export function Field({
   hint?: string;
   error?: string;
   optional?: boolean;
-  children: (props: { id: string; "aria-invalid": boolean; "aria-describedby"?: string }) => React.ReactNode;
+  /** Mandatory: shows the red * and marks the control aria-required. */
+  required?: boolean;
+  children: (props: { id: string; "aria-invalid": boolean; "aria-describedby"?: string; "aria-required"?: boolean }) => React.ReactNode;
   className?: string;
 }) {
   const id = useId();
@@ -28,10 +40,13 @@ export function Field({
   return (
     <div className={className}>
       <label htmlFor={id} className="mb-1.5 flex items-baseline justify-between text-[13px] font-medium text-foreground">
-        {label}
+        <span>
+          {label}
+          {required && <RequiredMark />}
+        </span>
         {optional && <span className="text-xs font-normal text-muted">Optional</span>}
       </label>
-      {children({ id, "aria-invalid": !!error, "aria-describedby": describedBy })}
+      {children({ id, "aria-invalid": !!error, "aria-describedby": describedBy, ...(required ? { "aria-required": true } : {}) })}
       <AnimatePresence initial={false} mode="wait">
         {error ? (
           <motion.p

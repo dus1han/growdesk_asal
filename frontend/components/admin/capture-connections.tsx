@@ -175,7 +175,7 @@ function AddConnectionForm({ onCreated }: { onCreated: (c: CaptureClientCreated)
 
   return (
     <form id="capture-connection-form" onSubmit={onSubmit} className="space-y-5" noValidate>
-      <Field label="Name" hint="Which PC or person this is for, so you know what to revoke later." error={errors.name?.message}>
+      <Field label="Name" required hint="Which PC or person this is for, so you know what to revoke later." error={errors.name?.message}>
         {(p) => <Input {...p} autoFocus placeholder="Reception PC" {...register("name")} />}
       </Field>
     </form>
