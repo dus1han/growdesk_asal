@@ -31,6 +31,9 @@ export interface SaveResponse {
   /** "Sarah Fernando was added." / "… was updated." */
   message?: string;
   action?: 'created' | 'updated';
+  /** The customer in GrowDesk, for the "saved" card and its Open in GrowDesk link. */
+  customerId?: number;
+  customerName?: string;
   warnings?: string[];
   error?: string;
   /** The field the CRM rejected, when it named one. */
@@ -46,6 +49,16 @@ export interface StatePushMessage {
   flash?: string;
   flashTone?: 'success' | 'error';
 }
+
+/** Service worker → content script: the text of the element last right-clicked on the page. */
+export interface ClickedTextRequest {
+  type: 'GD_GET_CLICKED_TEXT';
+}
+
+export type ClickedTextResponse = { text: string } | { error: string };
+
+export const isClickedTextRequest = (msg: unknown): msg is ClickedTextRequest =>
+  typeof msg === 'object' && msg !== null && (msg as ClickedTextRequest).type === 'GD_GET_CLICKED_TEXT';
 
 export const isStatePush = (msg: unknown): msg is StatePushMessage =>
   typeof msg === 'object' && msg !== null && (msg as StatePushMessage).type === 'GD_STATE';

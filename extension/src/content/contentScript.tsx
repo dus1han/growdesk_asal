@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
-import { saveBlocker, type CaptureSession, type FieldValue, type Platform } from '../types/capture';
+import { displayValue, enabledFields, saveBlocker, type CaptureSession, type FieldValue, type Platform } from '../types/capture';
 import type { ConfigBundle } from '../types/growdesk';
 import type { ContentMessage, SaveResponse, StateResponse } from '../types/messages';
-import { isStatePush } from '../types/messages';
+import { isClickedTextRequest, isStatePush, type ClickedTextResponse } from '../types/messages';
+import { pickedText } from '../utils/pageText';
 import { detectPlatform } from '../utils/platform';
 import { applyPageOffset, OFFSET_CLASS, removePageOffset, TOOLBAR_HEIGHT } from './pageOffset';
+import { SavedCard, type SavedLead } from './toolbar/SavedCard';
 import { Toolbar, type StatusMessage } from './toolbar/Toolbar';
 import toolbarCss from './toolbar/toolbar.css?inline';
 
@@ -40,6 +42,7 @@ function App({ platform }: { platform: Platform }) {
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [errorField, setErrorField] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState<SavedLead | null>(null);
   const timer = useRef<number | null>(null);
 
   /** Confirmations fade; errors and warnings stay until the next action, so they can't be missed. */
@@ -135,6 +138,7 @@ function App({ platform }: { platform: Platform }) {
       return;
     }
 
+    setSaved(savedLead(session!, bundle!, r));
     setSession(null);
     setErrorField(null);
     const text = `✓ ${r.message ?? 'Saved to GrowDesk.'}`;
@@ -160,22 +164,68 @@ function App({ platform }: { platform: Platform }) {
   );
 
   return (
-    <Toolbar
-      session={session}
-      bundle={bundle}
-      configured={configured}
-      platform={platform}
-      status={status}
-      busy={busy}
-      errorField={errorField}
-      onStart={() => void handleStart()}
-      onStop={() => void handleStop()}
-      onDiscard={() => void handleDiscard()}
-      onSetValue={(k, v) => void handleSetValue(k, v)}
-      onOpenSettings={() => void send({ type: 'GD_OPEN_SETTINGS' })}
-      onOpenGuide={() => void send({ type: 'GD_OPEN_GUIDE' })}
-    />
+    <>
+      <Toolbar
+        session={session}
+        bundle={bundle}
+        configured={configured}
+        platform={platform}
+        status={status}
+        busy={busy}
+        errorField={errorField}
+        onStart={() => void handleStart()}
+        onStop={() => void handleStop()}
+        onDiscard={() => void handleDiscard()}
+        onSetValue={(k, v) => void handleSetValue(k, v)}
+        onOpenSettings={() => void send({ type: 'GD_OPEN_SETTINGS' })}
+        onOpenGuide={() => void send({ type: 'GD_OPEN_GUIDE' })}
+      />
+      {saved && (
+        <div className="gd">
+          <SavedCard key={`${saved.customerId}-${saved.action}`} lead={saved} onClose={() => setSaved(null)} />
+        </div>
+      )}
+    </>
   );
+}
+
+/**
+ * The element last right-clicked, so "GrowDesk Capture → Set as …" can capture text that can't be
+ * selected. Only the element the user right-clicks is read, and only when they pick a menu item.
+ */
+let lastRightClicked: Element | null = null;
+window.addEventListener(
+  'contextmenu',
+  (e) => {
+    const target = e.composedPath()[0];
+    lastRightClicked = target instanceof Element ? target : null;
+  },
+  true,
+);
+chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  if (!isClickedTextRequest(message)) return false;
+  sendResponse(pickedText(lastRightClicked as HTMLElement | null) satisfies ClickedTextResponse);
+  return false;
+});
+
+/** What the "Saved in GrowDesk" card shows, from the capture that was just sent. */
+function savedLead(session: CaptureSession, bundle: ConfigBundle, r: SaveResponse): SavedLead {
+  const field = (key: string) => enabledFields(bundle).find((f) => f.key === key);
+  const shown = (key: string) => {
+    const f = field(key);
+    return f ? displayValue(f, session.values[key], bundle) || undefined : undefined;
+  };
+  const instagram = shown('instagram');
+  return {
+    customerId: r.customerId ?? 0,
+    name: r.customerName ?? shown('name') ?? 'Customer',
+    action: r.action ?? 'created',
+    contact: shown('whatsapp') ?? (instagram ? `@${instagram.replace(/^@/, '')}` : undefined),
+    treatments: shown('treatments'),
+    stage: shown('stage'),
+    warnings: r.warnings ?? [],
+    url: `${bundle.server}/customers/${r.customerId ?? ''}`,
+  };
 }
 
 /** Builds the shadow host element that carries the toolbar. */

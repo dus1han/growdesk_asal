@@ -12,6 +12,12 @@ const FIELD_PREFIX = 'growdesk-set:';
 
 const DOCUMENT_URL_PATTERNS = ['https://web.whatsapp.com/*', 'https://www.instagram.com/*'];
 
+/**
+ * Selected text, or anything right-clicked without a selection: WhatsApp doesn't let some text be
+ * selected (the name and number in Contact info), so right-clicking it must work too.
+ */
+const CONTEXTS: [chrome.contextMenus.ContextType, ...chrome.contextMenus.ContextType[]] = ['selection', 'page', 'link', 'image'];
+
 /** The field key a menu item sets, or null for other items. */
 export const fieldKeyFromMenuId = (id: string | number): string | null =>
   String(id).startsWith(FIELD_PREFIX) ? String(id).slice(FIELD_PREFIX.length) : null;
@@ -33,7 +39,7 @@ async function build(bundle: ConfigBundle | null): Promise<void> {
   await new Promise<void>((resolve) => chrome.contextMenus.removeAll(() => resolve()));
   menuIds = [];
 
-  await create({ id: ROOT_MENU_ID, title: 'GrowDesk Capture', contexts: ['selection'], documentUrlPatterns: DOCUMENT_URL_PATTERNS, visible });
+  await create({ id: ROOT_MENU_ID, title: 'GrowDesk Capture', contexts: CONTEXTS, documentUrlPatterns: DOCUMENT_URL_PATTERNS, visible });
   menuIds.push(ROOT_MENU_ID);
 
   for (const field of enabledFields(bundle).filter((f) => fieldKind(f) === 'highlight')) {
@@ -42,7 +48,7 @@ async function build(bundle: ConfigBundle | null): Promise<void> {
       id,
       parentId: ROOT_MENU_ID,
       title: field.type === 'textarea' ? `Add to ${field.label}` : `Set as ${field.label}`,
-      contexts: ['selection'],
+      contexts: CONTEXTS,
       documentUrlPatterns: DOCUMENT_URL_PATTERNS,
       visible,
     });

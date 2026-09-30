@@ -206,8 +206,8 @@ function Highlighted({
       <div className="gd-pop-body">
         {hasValue(value) && <div className="gd-pop-value">{String(value)}</div>}
         <p className="gd-pop-hint">
-          {hasValue(value) ? 'To change it, highlight' : 'Highlight'} the text on the page, right-click, then choose{' '}
-          <strong>GrowDesk Capture → {verb}</strong>.
+          {hasValue(value) ? 'To change it, right-click' : 'Right-click'} the text on the page, then choose{' '}
+          <strong>GrowDesk Capture → {verb}</strong>. To take part of a longer message, highlight that part first.
         </p>
       </div>
       {hasValue(value) && (

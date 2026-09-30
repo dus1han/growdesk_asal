@@ -423,7 +423,7 @@ export const GUIDE_SCENES: GuideScene[] = [
   },
   {
     title: "Highlight the name",
-    text: "Select the name in the chat, right-click, then choose GrowDesk Capture → Set as Name. The Name chip fills in.",
+    text: "Right-click the name and choose GrowDesk Capture → Set as Name. The Name chip fills in. Text WhatsApp won't let you select, like the name in Contact info, works the same way; to take part of a message, highlight that part first.",
     Scene: NameScene,
   },
   {
