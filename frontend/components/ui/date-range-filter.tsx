@@ -7,7 +7,13 @@ import { useState } from "react";
 import { addDays, formatDate, isoDate, today, type DateRange } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
-const PRESETS: { label: string; range: () => DateRange }[] = [
+export interface RangePreset {
+  label: string;
+  range: () => DateRange;
+}
+
+/** Looking back: history and reports. */
+export const PAST_PRESETS: RangePreset[] = [
   { label: "Today", range: () => ({ from: today(), to: today() }) },
   { label: "Last 7 days", range: () => ({ from: isoDate(addDays(new Date(), -6)), to: today() }) },
   { label: "Last 30 days", range: () => ({ from: isoDate(addDays(new Date(), -29)), to: today() }) },
@@ -31,6 +37,27 @@ const PRESETS: { label: string; range: () => DateRange }[] = [
   },
 ];
 
+/** Looking ahead: upcoming bookings. */
+export const FUTURE_PRESETS: RangePreset[] = [
+  { label: "Tomorrow", range: () => ({ from: isoDate(addDays(new Date(), 1)), to: isoDate(addDays(new Date(), 1)) }) },
+  { label: "Next 7 days", range: () => ({ from: today(), to: isoDate(addDays(new Date(), 6)) }) },
+  { label: "Next 30 days", range: () => ({ from: today(), to: isoDate(addDays(new Date(), 29)) }) },
+  {
+    label: "This month",
+    range: () => {
+      const n = new Date();
+      return { from: today(), to: isoDate(new Date(n.getFullYear(), n.getMonth() + 1, 0)) };
+    },
+  },
+  {
+    label: "Next month",
+    range: () => {
+      const n = new Date();
+      return { from: isoDate(new Date(n.getFullYear(), n.getMonth() + 1, 1)), to: isoDate(new Date(n.getFullYear(), n.getMonth() + 2, 0)) };
+    },
+  },
+];
+
 function describe(r: DateRange) {
   if (r.from && r.to) return r.from === r.to ? formatDate(r.from) : `${formatDate(r.from)} – ${formatDate(r.to)}`;
   if (r.from) return `From ${formatDate(r.from)}`;
@@ -39,7 +66,20 @@ function describe(r: DateRange) {
 }
 
 /** A date-range pill with quick presets and custom from/to dates. */
-export function DateRangeFilter({ label = "Date", value, onChange }: { label?: string; value: DateRange; onChange: (r: DateRange) => void }) {
+export function DateRangeFilter({
+  label = "Date",
+  value,
+  onChange,
+  presets = PAST_PRESETS,
+  min,
+}: {
+  label?: string;
+  value: DateRange;
+  onChange: (r: DateRange) => void;
+  presets?: RangePreset[];
+  /** Earliest date the custom inputs allow (e.g. today for upcoming bookings). */
+  min?: string;
+}) {
   const [open, setOpen] = useState(false);
   const set = !!(value.from || value.to);
 
@@ -74,7 +114,7 @@ export function DateRangeFilter({ label = "Date", value, onChange }: { label?: s
                 className="z-50 w-72 rounded-xl border border-line bg-surface p-2 shadow-pop"
               >
                 <div className="grid grid-cols-2 gap-1">
-                  {PRESETS.map((p) => (
+                  {presets.map((p) => (
                     <button
                       key={p.label}
                       type="button"
@@ -94,6 +134,7 @@ export function DateRangeFilter({ label = "Date", value, onChange }: { label?: s
                     <input
                       type="date"
                       value={value.from ?? ""}
+                      min={min}
                       max={value.to}
                       onChange={(e) => onChange({ ...value, from: e.target.value || undefined })}
                       className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm text-foreground focus:border-brand focus:outline-none"
@@ -104,7 +145,7 @@ export function DateRangeFilter({ label = "Date", value, onChange }: { label?: s
                     <input
                       type="date"
                       value={value.to ?? ""}
-                      min={value.from}
+                      min={value.from ?? min}
                       onChange={(e) => onChange({ ...value, to: e.target.value || undefined })}
                       className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm text-foreground focus:border-brand focus:outline-none"
                     />

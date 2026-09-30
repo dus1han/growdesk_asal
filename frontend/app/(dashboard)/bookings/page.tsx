@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { RequirePermission } from "@/components/layout/require-permission";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { DateRangeFilter } from "@/components/ui/date-range-filter";
+import { DateRangeFilter, FUTURE_PRESETS, PAST_PRESETS } from "@/components/ui/date-range-filter";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterMenu } from "@/components/ui/filter-menu";
 import { Pagination } from "@/components/ui/pagination";
@@ -38,19 +38,14 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
-function queryFor(tab: Tab, t: string): BookingQuery {
-  switch (tab) {
-    case "upcoming":
-      return { from: t, status: "Booked", sort: "asc" };
-    case "today":
-      return { from: t, to: t, sort: "asc" };
-    case "history":
-      return { to: t, sort: "desc" };
-  }
-}
+/** Which filters each tab offers. The doctor filter is shared by all tabs. */
+const TAB_FILTERS: Record<Tab, { range: boolean; status: boolean; payment: boolean }> = {
+  upcoming: { range: true, status: false, payment: false }, // always Booked, not paid yet
+  today: { range: false, status: true, payment: true }, // always today
+  history: { range: true, status: true, payment: true },
+};
 
-/** History's own filters (spec: history must be filterable and exportable). */
-interface HistoryFilters {
+interface Filters {
   search: string;
   range: DateRange;
   status?: string;
@@ -58,19 +53,43 @@ interface HistoryFilters {
   payment?: string;
 }
 
-const NO_HISTORY_FILTERS: HistoryFilters = { search: "", range: {} };
+const NO_FILTERS: Filters = { search: "", range: {} };
+const NO_FILTERS_BY_TAB: Record<Tab, Filters> = { upcoming: NO_FILTERS, today: NO_FILTERS, history: NO_FILTERS };
 
-function historyQuery(f: HistoryFilters, t: string, doctor: string | undefined): BookingQuery {
-  return {
-    from: f.range.from,
-    to: f.range.to ?? (f.range.from ? undefined : t),
-    status: f.status,
-    treatmentId: f.treatment ? Number(f.treatment) : undefined,
-    paymentStatus: f.payment,
+/** The list (and export) query for a tab: its fixed window plus the filters it offers. */
+function buildQuery(tab: Tab, f: Filters, t: string, doctor: string | undefined): BookingQuery {
+  const common: BookingQuery = {
     search: f.search.trim() || undefined,
+    treatmentId: f.treatment ? Number(f.treatment) : undefined,
     doctorId: doctor ? Number(doctor) : undefined,
-    sort: "desc",
   };
+  switch (tab) {
+    case "upcoming":
+      // Never earlier than today, whatever range is chosen.
+      return { ...common, from: f.range.from && f.range.from > t ? f.range.from : t, to: f.range.to, status: "Booked", sort: "asc" };
+    case "today":
+      return { ...common, from: t, to: t, status: f.status, paymentStatus: f.payment, sort: "asc" };
+    case "history":
+      return {
+        ...common,
+        from: f.range.from,
+        to: f.range.to ?? (f.range.from ? undefined : t),
+        status: f.status,
+        paymentStatus: f.payment,
+        sort: "desc",
+      };
+  }
+}
+
+function isFiltered(tab: Tab, f: Filters) {
+  const offers = TAB_FILTERS[tab];
+  return (
+    !!f.search.trim() ||
+    !!f.treatment ||
+    (offers.range && !!(f.range.from || f.range.to)) ||
+    (offers.status && !!f.status) ||
+    (offers.payment && !!f.payment)
+  );
 }
 
 function toQueryString(q: object) {
@@ -89,31 +108,30 @@ export default function BookingsPage() {
   const [doctor, setDoctor] = useState<string | undefined>();
   const [openId, setOpenId] = useState<number | null>(null);
   const [booking, setBooking] = useState(false);
-  const [history, setHistory] = useState<HistoryFilters>(NO_HISTORY_FILTERS);
+  // Each tab remembers its own filters.
+  const [filtersByTab, setFiltersByTab] = useState(NO_FILTERS_BY_TAB);
   const [exporting, setExporting] = useState(false);
   const doctors = useDoctorOptions();
   const treatments = useActiveLookup("treatments");
   const canSeePayments = can(session?.user, Permission.PaymentsView);
-  const search = useDebouncedValue(history.search, 300);
 
+  const filters = filtersByTab[tab];
+  const offers = TAB_FILTERS[tab];
+  const search = useDebouncedValue(filters.search, 300);
   const t = locale?.today ?? today();
-  const isHistory = tab === "history";
-  const query = isHistory
-    ? historyQuery({ ...history, search }, t, doctor)
-    : { ...queryFor(tab, t), doctorId: doctor ? Number(doctor) : undefined };
+  const query = buildQuery(tab, { ...filters, search }, t, doctor);
   const { data, isPending, isError, isFetching, refetch } = useBookings({ ...query, page, pageSize: PAGE_SIZE });
 
-  const setHistoryFilter = (patch: Partial<HistoryFilters>) => {
-    setHistory((h) => ({ ...h, ...patch }));
+  const setFilter = (patch: Partial<Filters>) => {
+    setFiltersByTab((all) => ({ ...all, [tab]: { ...all[tab], ...patch } }));
     setPage(1);
   };
-  const historyFiltered =
-    !!history.search || !!history.range.from || !!history.range.to || !!history.status || !!history.treatment || !!history.payment;
+  const filtered = isFiltered(tab, filters);
 
   const exportExcel = async () => {
     setExporting(true);
     try {
-      await downloadFile(`/bookings/export?${toQueryString(historyQuery({ ...history, search }, t, doctor))}`, "bookings.xlsx");
+      await downloadFile(`/bookings/export?${toQueryString(query)}`, "bookings.xlsx");
       toast.success(`Exported ${data?.totalCount ?? ""} bookings to Excel`);
     } catch (error) {
       toastError(error);
@@ -175,12 +193,11 @@ export default function BookingsPage() {
           </div>
         </div>
 
-        {isHistory && (
-          <div className="flex flex-col gap-3 border-b border-line p-4">
+        <div className="flex flex-col gap-3 border-b border-line p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <SearchInput
-                value={history.search}
-                onChange={(v) => setHistoryFilter({ search: v })}
+                value={filters.search}
+                onChange={(v) => setFilter({ search: v })}
                 placeholder="Search by customer name or number…"
                 className="flex-1 sm:max-w-sm"
               />
@@ -190,30 +207,39 @@ export default function BookingsPage() {
               </Button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <DateRangeFilter value={history.range} onChange={(range) => setHistoryFilter({ range })} />
-              <FilterMenu
-                label="Status"
-                value={history.status}
-                onChange={(v) => setHistoryFilter({ status: v })}
-                options={[
-                  { value: "Completed", label: "Completed" },
-                  { value: "Booked", label: "Booked" },
-                  { value: "Rescheduled", label: "Rescheduled" },
-                  { value: "Cancelled", label: "Cancelled" },
-                  { value: "NoShow", label: "No-show" },
-                ]}
-              />
+              {offers.range && (
+                <DateRangeFilter
+                  value={filters.range}
+                  onChange={(range) => setFilter({ range })}
+                  presets={tab === "upcoming" ? FUTURE_PRESETS : PAST_PRESETS}
+                  min={tab === "upcoming" ? t : undefined}
+                />
+              )}
+              {offers.status && (
+                <FilterMenu
+                  label="Status"
+                  value={filters.status}
+                  onChange={(v) => setFilter({ status: v })}
+                  options={[
+                    { value: "Completed", label: "Completed" },
+                    { value: "Booked", label: "Booked" },
+                    { value: "Rescheduled", label: "Rescheduled" },
+                    { value: "Cancelled", label: "Cancelled" },
+                    { value: "NoShow", label: "No-show" },
+                  ]}
+                />
+              )}
               <FilterMenu
                 label="Treatment"
-                value={history.treatment}
-                onChange={(v) => setHistoryFilter({ treatment: v })}
+                value={filters.treatment}
+                onChange={(v) => setFilter({ treatment: v })}
                 options={treatments.data?.map((x) => ({ value: String(x.id), label: x.name })) ?? []}
               />
-              {canSeePayments && (
+              {canSeePayments && offers.payment && (
                 <FilterMenu
                   label="Payment"
-                  value={history.payment}
-                  onChange={(v) => setHistoryFilter({ payment: v })}
+                  value={filters.payment}
+                  onChange={(v) => setFilter({ payment: v })}
                   options={[
                     { value: "Paid", label: "Paid" },
                     { value: "Pending", label: "Pending" },
@@ -221,14 +247,20 @@ export default function BookingsPage() {
                   ]}
                 />
               )}
-              {historyFiltered && (
-                <button type="button" onClick={() => { setHistory(NO_HISTORY_FILTERS); setPage(1); }} className="px-2 text-sm font-medium text-muted hover:text-foreground">
+              {filtered && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltersByTab((all) => ({ ...all, [tab]: NO_FILTERS }));
+                    setPage(1);
+                  }}
+                  className="px-2 text-sm font-medium text-muted hover:text-foreground"
+                >
                   Clear all
                 </button>
               )}
             </div>
           </div>
-        )}
 
         {isPending ? (
           <div className="divide-y divide-line" aria-busy="true" aria-label="Loading">
@@ -254,11 +286,12 @@ export default function BookingsPage() {
         ) : data.items.length === 0 ? (
           <EmptyState
             icon={CalendarX2}
-            title={isHistory && historyFiltered ? "No bookings match these filters" : meta.empty}
-            description={isHistory && historyFiltered ? "Try widening the date range or clearing a filter." : meta.hint}
+            title={filtered ? "No bookings match these filters" : meta.empty}
+            description={filtered ? "Try widening the date range or clearing a filter." : meta.hint}
             action={
               canBook &&
-              tab !== "history" && (
+              tab !== "history" &&
+              !filtered && (
                 <Button onClick={() => setBooking(true)}>
                   <Plus className="size-4" /> Book consultation
                 </Button>
