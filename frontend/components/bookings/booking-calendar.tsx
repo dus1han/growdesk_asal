@@ -8,7 +8,7 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FilterMenu } from "@/components/ui/filter-menu";
 import { Switch } from "@/components/ui/form-controls";
@@ -99,6 +99,8 @@ export function BookingCalendar({ onOpenBooking, onPickSlot }: Props) {
     onPickSlot({ date, startTime, endTime: `${String(Math.floor(endMin / 60)).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}` });
   };
 
+  const { ref: fitRef, height: fitHeight } = useFillViewport();
+
   return (
     <div className="gd-calendar">
       {/* Toolbar */}
@@ -149,7 +151,7 @@ export function BookingCalendar({ onOpenBooking, onPickSlot }: Props) {
         </div>
       </div>
 
-      <div className="h-[calc(100dvh-260px)] min-h-[520px] p-2 sm:p-3">
+      <div ref={fitRef} style={{ height: fitHeight }} className="p-2 sm:p-3">
         <FullCalendar
           ref={ref}
           plugins={[timeGridPlugin, dayGridPlugin, listPlugin, interactionPlugin]}
@@ -215,4 +217,35 @@ function renderEvent(arg: EventContentArg) {
       <span className="truncate text-foreground/70">{b.treatments.map((t) => t.name).join(" + ")}</span>
     </div>
   );
+}
+
+/**
+ * Sizes the calendar to exactly the space left below it in the window, so the page itself never
+ * scrolls; only the calendar's time grid does. Falls back to a comfortable minimum on short screens.
+ */
+function useFillViewport(min = 340) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number>(min);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const main = el.closest("main");
+      const bottomPadding = main ? parseFloat(getComputedStyle(main).paddingBottom) : 0;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      // 1px for the card's bottom border.
+      setHeight(Math.max(min, Math.floor(window.innerHeight - top - bottomPadding - 1)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (el.parentElement) observer.observe(el.parentElement);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [min]);
+
+  return { ref, height };
 }
