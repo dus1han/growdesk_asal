@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -66,7 +67,7 @@ public class CustomerIntegrationTests(ApiFactory factory) : IClassFixture<ApiFac
         new(name, whatsApp, null, instagram, null, stageId, null, null, treatments ?? [1], null, null, null, customFields);
 
     [Fact]
-    public async Task A_new_customer_needs_a_treatment_but_an_existing_one_can_be_saved_without()
+    public async Task Treatments_are_required_and_cannot_be_emptied()
     {
         var admin = await AdminAsync();
         var none = await admin.PostAsJsonAsync("/api/customers",
@@ -76,11 +77,27 @@ public class CustomerIntegrationTests(ApiFactory factory) : IClassFixture<ApiFac
         Assert.Equal("Choose at least one interested treatment.", body!.Message);
         Assert.Equal("treatmentIds", body.Errors![0].Field);
 
-        // Editing later may clear the interests (e.g. a customer captured without any).
+        // An edit can change the interests but not remove them all.
         var created = await DataAsync<CustomerDetailDto>(await admin.PostAsJsonAsync("/api/customers", Customer("Has Treatment", NewNumber())));
-        var cleared = await DataAsync<CustomerDetailDto>(await admin.PutAsJsonAsync($"/api/customers/{created.Id}",
-            new SaveCustomerRequest("Has Treatment", created.WhatsApp, null, null, null, null, null, null, [], null, null, null, null)));
-        Assert.Empty(cleared.Treatments);
+        var cleared = await admin.PutAsJsonAsync($"/api/customers/{created.Id}",
+            new SaveCustomerRequest("Has Treatment", created.WhatsApp, null, null, null, null, null, null, [], null, null, null, null));
+        Assert.Equal(HttpStatusCode.BadRequest, cleared.StatusCode);
+
+        // A customer who never had one (captured without) can still be saved, e.g. a stage change.
+        int bare;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DoctorCrm.Api.Data.AppDbContext>();
+            var stage = db.Stages.Single(s => s.SystemKey == "interested");
+            var c = new DoctorCrm.Api.Entities.Customer { Name = "Captured Bare", WhatsAppNumber = "+971500009999", StageId = stage.Id };
+            db.Customers.Add(c);
+            await db.SaveChangesAsync();
+            bare = c.Id;
+        }
+        var followUp = (await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/stages"))).Single(s => s.SystemKey == "follow_up");
+        var moved = await DataAsync<CustomerDetailDto>(await admin.PutAsJsonAsync($"/api/customers/{bare}",
+            new SaveCustomerRequest("Captured Bare", "+971500009999", null, null, null, followUp.Id, null, null, [], null, null, null, null)));
+        Assert.Equal("follow_up", moved.Stage.SystemKey);
     }
 
     [Fact]

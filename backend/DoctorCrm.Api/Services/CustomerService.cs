@@ -119,8 +119,7 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
 
     public async Task<CustomerDetailDto> CreateAsync(SaveCustomerRequest request, int? userId, CancellationToken ct)
     {
-        // A new customer is added for a treatment they're interested in. Only on creation: older
-        // customers (e.g. captured without one) can still be edited and moved between stages.
+        // A new customer is added for a treatment they're interested in.
         if (request.TreatmentIds is not { Count: > 0 })
             throw new BusinessRuleException("Choose at least one interested treatment.", field: "treatmentIds");
 
@@ -145,6 +144,11 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
 
         var oldStage = customer.Stage;
         var oldTreatments = customer.Treatments.Select(t => t.TreatmentId).ToHashSet();
+
+        // Interests can change but not be emptied. A customer who never had one (e.g. captured
+        // without) can still be saved as is, so a quick stage change keeps working.
+        if (oldTreatments.Count > 0 && request.TreatmentIds is not { Count: > 0 })
+            throw new BusinessRuleException("Choose at least one interested treatment.", field: "treatmentIds");
 
         await ApplyAsync(customer, request, isNew: false, ct);
 

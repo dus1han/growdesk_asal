@@ -43,8 +43,8 @@ const schema = z
   });
 type FormValues = z.infer<typeof schema>;
 
-/** Adding a customer also needs an interested treatment (backend CustomerService.CreateAsync). */
-const newCustomerSchema = schema.refine((v) => v.treatmentIds.length > 0, {
+/** Every customer saved from this form needs an interested treatment (backend CustomerService). */
+const formSchema = schema.refine((v) => v.treatmentIds.length > 0, {
   path: ["treatmentIds"],
   message: "Choose at least one interested treatment.",
 });
@@ -111,7 +111,7 @@ function CustomerForm({
     setValue,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(customer ? schema : newCustomerSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       name: customer?.name ?? "",
       whatsApp: customer?.whatsApp ?? "",
@@ -281,7 +281,7 @@ function CustomerForm({
 
       <fieldset>
         <legend className="mb-2 text-[13px] font-medium">
-          Interested treatments{!customer && <span className="ml-0.5 text-danger" aria-hidden>*</span>}
+          Interested treatments<span className="ml-0.5 text-danger" aria-hidden>*</span>
         </legend>
         {errors.treatmentIds?.message && <p className="-mt-1 mb-2 text-xs text-danger">{errors.treatmentIds.message}</p>}
         <div className="flex flex-wrap gap-2">

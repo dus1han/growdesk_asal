@@ -267,7 +267,9 @@ function BookingForm({
       )}
 
       <fieldset>
-        <legend className="mb-2 text-[13px] font-medium">Treatments</legend>
+        <legend className="mb-2 text-[13px] font-medium">
+          Treatments<span className="ml-0.5 text-danger" aria-hidden>*</span>
+        </legend>
         <div className="flex flex-wrap gap-2" aria-busy={treatments.isPending}>
           {treatments.isPending && [72, 96, 84, 110].map((w) => <Skeleton key={w} className="h-7 rounded-lg" style={{ width: w }} />)}
           {treatments.data?.map((t) => {
