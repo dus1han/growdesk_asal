@@ -73,3 +73,38 @@ export const api = {
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>("PATCH", path, { ...options, body }),
   delete: <T>(path: string, options?: RequestOptions) => request<T>("DELETE", path, options),
 };
+
+/**
+ * Downloads a file from the API (e.g. an Excel export) and saves it with the server's file name.
+ * Errors come back as the usual JSON envelope and are thrown as ApiError, like other calls.
+ */
+export async function downloadFile(path: string, fallbackName: string) {
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, { credentials: "same-origin" });
+  } catch {
+    throw new ApiError("Can't reach the server. Check your connection and try again.", 0);
+  }
+
+  if (!response.ok) {
+    let envelope: ApiEnvelope<unknown> | null = null;
+    try {
+      envelope = (await response.json()) as ApiEnvelope<unknown>;
+    } catch {
+      // not JSON
+    }
+    if (response.status === 401 && typeof window !== "undefined") window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    throw new ApiError(envelope?.message ?? FRIENDLY_FALLBACK, response.status, envelope?.errors ?? []);
+  }
+
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const name = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await response.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = decodeURIComponent(name);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

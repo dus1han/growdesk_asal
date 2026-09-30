@@ -121,6 +121,7 @@ builder.Services.AddScoped<ClinicClock>();
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<StageAutomation>();
 builder.Services.AddScoped<BookingService>();
+builder.Services.AddScoped<BookingExportService>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 builder.Services.AddControllers(o => o.Filters.Add<ValidationFilter>())

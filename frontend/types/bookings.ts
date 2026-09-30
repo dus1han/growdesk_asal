@@ -68,6 +68,9 @@ export interface BookingQuery {
   customerId?: number;
   doctorId?: number;
   status?: string;
+  treatmentId?: number;
+  paymentStatus?: string;
+  search?: string;
   page?: number;
   pageSize?: number;
   sort?: "asc" | "desc";

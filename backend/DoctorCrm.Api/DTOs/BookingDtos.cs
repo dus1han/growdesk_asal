@@ -9,6 +9,11 @@ public class BookingQuery
     public int? DoctorId { get; set; }
     /// <summary>Comma-separated statuses, e.g. "Booked,Completed".</summary>
     public string? Status { get; set; }
+    public int? TreatmentId { get; set; }
+    /// <summary>Paid, Pending or Waived.</summary>
+    public string? PaymentStatus { get; set; }
+    /// <summary>Customer name, WhatsApp number or Instagram name.</summary>
+    public string? Search { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 50;
     /// <summary>"asc" (default, upcoming first) or "desc" (history).</summary>

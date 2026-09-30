@@ -228,6 +228,57 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
     }
 
     [Fact]
+    public async Task History_filters_combine_and_the_export_matches_them()
+    {
+        var admin = await AdminAsync();
+        var (customer, treatments) = await NewCustomerAsync(admin);
+        var methods = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/payment-methods"));
+        var day = NewDay();
+
+        var paid = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings", Book(customer.Id, day, T(9), T(9, 30), [treatments[0].Id])));
+        await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{paid.Id}/complete",
+            new CompleteBookingRequest(400, "Paid", methods[0].Id, null, null, null)));
+        var pending = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings", Book(customer.Id, day, T(10), T(10, 30), [treatments[1].Id])));
+        await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{pending.Id}/complete",
+            new CompleteBookingRequest(150, "Pending", null, null, null, null)));
+
+        var range = $"from={day:yyyy-MM-dd}&to={day:yyyy-MM-dd}";
+        var byPayment = await DataAsync<PagedResult<BookingListItemDto>>(await admin.GetAsync($"/api/bookings?{range}&paymentStatus=Paid"));
+        Assert.Equal([paid.Id], byPayment.Items.Select(b => b.Id));
+        var byTreatment = await DataAsync<PagedResult<BookingListItemDto>>(await admin.GetAsync($"/api/bookings?{range}&treatmentId={treatments[1].Id}"));
+        Assert.Equal([pending.Id], byTreatment.Items.Select(b => b.Id));
+        var bySearch = await DataAsync<PagedResult<BookingListItemDto>>(await admin.GetAsync($"/api/bookings?{range}&search={Uri.EscapeDataString(customer.Name)}"));
+        Assert.Equal(2, bySearch.TotalCount);
+
+        // The export contains exactly the filtered rows.
+        var file = await admin.GetAsync($"/api/bookings/export?{range}&paymentStatus=Paid&sort=desc");
+        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", file.Content.Headers.ContentType!.MediaType);
+        using (var workbook = new ClosedXML.Excel.XLWorkbook(await file.Content.ReadAsStreamAsync()))
+        {
+            var sheet = workbook.Worksheet(1);
+            var headers = sheet.Row(1).CellsUsed().Select(c => c.GetString()).ToList();
+            Assert.Contains("Charge (AED)", headers);
+            Assert.Equal(2, sheet.LastRowUsed()!.RowNumber()); // header + 1 row
+            Assert.Equal(customer.Name, sheet.Cell(2, headers.IndexOf("Customer") + 1).GetString());
+            Assert.Equal(400, sheet.Cell(2, headers.IndexOf("Charge (AED)") + 1).GetDouble());
+        }
+
+        // Without the payments permission, payment columns are left out.
+        var roles = await DataAsync<List<RoleDto>>(await admin.GetAsync("/api/roles"));
+        var username = $"staff_x{Interlocked.Increment(ref _seq)}";
+        await DataAsync<UserDto>(await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("Staff", username, null, roles.Single(r => r.Name == "Staff").Id, "Staff-Pass-1")));
+        var staff = factory.CreateCookieClient();
+        (await staff.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, "Staff-Pass-1"))).EnsureSuccessStatusCode();
+        using (var workbook = new ClosedXML.Excel.XLWorkbook(await (await staff.GetAsync($"/api/bookings/export?{range}")).Content.ReadAsStreamAsync()))
+        {
+            var headers = workbook.Worksheet(1).Row(1).CellsUsed().Select(c => c.GetString()).ToList();
+            Assert.DoesNotContain("Charge (AED)", headers);
+            Assert.Contains("Customer", headers);
+        }
+    }
+
+    [Fact]
     public async Task Staff_can_view_bookings_but_not_book_or_complete()
     {
         var admin = await AdminAsync();

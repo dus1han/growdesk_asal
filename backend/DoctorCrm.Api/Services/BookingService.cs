@@ -18,23 +18,7 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
     {
         var page = Math.Max(1, q.Page);
         var size = Math.Clamp(q.PageSize, 1, MaxPageSize);
-        var query = db.Bookings.AsNoTracking();
-
-        if (q.From is { } from) query = query.Where(b => b.BookingDate >= from);
-        if (q.To is { } to) query = query.Where(b => b.BookingDate <= to);
-        if (q.CustomerId is { } customerId) query = query.Where(b => b.CustomerId == customerId);
-        if (q.DoctorId is { } doctorId) query = query.Where(b => b.DoctorId == doctorId);
-        if (!string.IsNullOrWhiteSpace(q.Status))
-        {
-            var statuses = q.Status.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(s => Enum.TryParse<BookingStatus>(s, true, out var st) ? st : (BookingStatus?)null)
-                .Where(s => s is not null).Select(s => s!.Value).ToList();
-            query = query.Where(b => statuses.Contains(b.Status));
-        }
-
-        query = q.Sort == "desc"
-            ? query.OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.StartTime)
-            : query.OrderBy(b => b.BookingDate).ThenBy(b => b.StartTime);
+        var query = Filter(db.Bookings.AsNoTracking(), q);
 
         var total = await query.CountAsync(ct);
         var items = await query
@@ -52,6 +36,43 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
             .ToListAsync(ct);
 
         return new PagedResult<BookingListItemDto>(items, page, size, total);
+    }
+
+    /// <summary>
+    /// Every list filter, combined with AND and sorted. Shared by the list and the Excel export,
+    /// so an export always contains exactly what the screen shows.
+    /// </summary>
+    public static IQueryable<Booking> Filter(IQueryable<Booking> query, BookingQuery q)
+    {
+        if (q.From is { } from) query = query.Where(b => b.BookingDate >= from);
+        if (q.To is { } to) query = query.Where(b => b.BookingDate <= to);
+        if (q.CustomerId is { } customerId) query = query.Where(b => b.CustomerId == customerId);
+        if (q.DoctorId is { } doctorId) query = query.Where(b => b.DoctorId == doctorId);
+        if (q.TreatmentId is { } treatmentId) query = query.Where(b => b.Treatments.Any(t => t.TreatmentId == treatmentId));
+        if (!string.IsNullOrWhiteSpace(q.Status))
+        {
+            var statuses = q.Status.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => Enum.TryParse<BookingStatus>(s, true, out var st) ? st : (BookingStatus?)null)
+                .Where(s => s is not null).Select(s => s!.Value).ToList();
+            query = query.Where(b => statuses.Contains(b.Status));
+        }
+        if (Enum.TryParse<PaymentStatus>(q.PaymentStatus, true, out var payment))
+            query = query.Where(b => b.Payments.Any(p => p.Status == payment));
+        if (!string.IsNullOrWhiteSpace(q.Search))
+        {
+            var term = q.Search.Trim();
+            var like = $"%{term}%";
+            var handle = $"%{term.TrimStart('@').ToLowerInvariant()}%";
+            var digits = new string(term.Where(char.IsDigit).ToArray()).TrimStart('0');
+            var digitsLike = $"%{digits}%";
+            query = query.Where(b => EF.Functions.ILike(b.Customer.Name, like)
+                                     || (b.Customer.InstagramName != null && EF.Functions.Like(b.Customer.InstagramName, handle))
+                                     || (digits.Length >= 3 && b.Customer.WhatsAppNumber != null && EF.Functions.Like(b.Customer.WhatsAppNumber, digitsLike)));
+        }
+
+        return q.Sort == "desc"
+            ? query.OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.StartTime).ThenByDescending(b => b.Id)
+            : query.OrderBy(b => b.BookingDate).ThenBy(b => b.StartTime).ThenBy(b => b.Id);
     }
 
     public async Task<BookingDetailDto> GetAsync(int id, CancellationToken ct)

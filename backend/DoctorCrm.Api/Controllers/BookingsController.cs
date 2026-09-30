@@ -10,8 +10,20 @@ namespace DoctorCrm.Api.Controllers;
 [ApiController]
 [Route("api/bookings")]
 [HasPermission(Permissions.BookingsView)]
-public class BookingsController(BookingService bookings) : ControllerBase
+public class BookingsController(BookingService bookings, BookingExportService export) : ControllerBase
 {
+    /// <summary>
+    /// The filtered list as an Excel workbook (same filters as GET /api/bookings). Charge and
+    /// payment columns are included only for users who may see payments.
+    /// </summary>
+    [HttpGet("export")]
+    public async Task<IActionResult> Export([FromQuery] BookingQuery query, CancellationToken ct)
+    {
+        var includePayments = User.HasClaim(Authentication.CrmClaims.Permission, Permissions.PaymentsView);
+        var (bytes, fileName) = await export.CreateAsync(query, includePayments, User.GetUserId(), ct);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
     /// <summary>Bookings by date range, customer, doctor and status. Used by the calendar and lists.</summary>
     [HttpGet]
     public async Task<ActionResult<ApiResponse<PagedResult<BookingListItemDto>>>> List([FromQuery] BookingQuery query, CancellationToken ct) =>
