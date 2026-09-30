@@ -222,6 +222,11 @@ function App({ platform }: { platform: Platform }) {
         onDraw={(key) => setDrawing(key)}
         installType={installType}
         onReloadExtension={() => void send({ type: 'GD_RELOAD_EXTENSION' })}
+        onUpdateNow={async () => {
+          const r = await send({ type: 'GD_UPDATE_NOW' });
+          return r.ok ? null : (r.error ?? 'Could not update.');
+        }}
+        onOpenExtensions={() => void send({ type: 'GD_OPEN_EXTENSIONS' })}
       />
       {saved && (
         <div className="gd">

@@ -28,6 +28,7 @@ const {
   normalizeSelection,
   platformFromHostname,
   isNewerVersion,
+  updateRequired,
   isConfigured,
   normalizeServer,
   originPattern,
@@ -131,6 +132,10 @@ check('Update notice: version comparison', () => {
   assert.equal(isNewerVersion('1.1', '1.0.9'), true);
   assert.equal(isNewerVersion('1.0.7', '1.0.7'), false);
   assert.equal(isNewerVersion('1.0.6', '1.0.7'), false);
+  assert.equal(updateRequired({ latest: { version: '1.0.10', download: '', guide: '' } }, '1.0.9'), true);
+  assert.equal(updateRequired({ latest: { version: '1.0.9', download: '', guide: '' } }, '1.0.9'), false);
+  assert.equal(updateRequired({ latest: null }, '1.0.9'), false);
+  assert.equal(updateRequired(null, '1.0.9'), false);
 });
 check('Platform detection', () => {
   assert.equal(platformFromHostname('web.whatsapp.com'), 'WhatsApp');

@@ -4,6 +4,7 @@ import type { ContentMessage, SaveResponse, StatePushMessage, StateResponse } fr
 import { clearSession, isTabCapturing, readSession, writeSession } from '../storage/captureSession';
 import { guideUrl, isConfigured, readSettings } from '../storage/settings';
 import { cachedBundle, GrowDeskError, loadBundle, sendLead } from '../api/growdesk';
+import { updateRequired } from '../utils/version';
 import { fieldKeyFromMenuId, rebuildMenus, setMenusVisible } from './contextMenus';
 import { mergeHighlight, normalizeSelection } from '../utils/normalize';
 import { platformFromUrl } from '../utils/platform';
@@ -144,6 +145,33 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendRespo
     sendResponse({ ok: true });
     return false;
   }
+  if (message.type === 'GD_UPDATE_NOW') {
+    void chrome.runtime
+      .requestUpdateCheck()
+      .then(async ({ status }) => {
+        if (status === 'update_available') {
+          // Chrome has downloaded it; reloading installs it, then onInstalled refreshes the tabs.
+          sendResponse({ ok: true });
+          await chrome.storage.local.set({ [RELOAD_TABS_KEY]: true });
+          chrome.runtime.reload();
+          return;
+        }
+        sendResponse({
+          ok: false,
+          error:
+            status === 'throttled'
+              ? 'Chrome checked a moment ago. Try again in a minute, or use Extensions below.'
+              : "Chrome hasn't found the new version yet. Try again in a minute, or use Extensions below.",
+        });
+      })
+      .catch(() => sendResponse({ ok: false, error: 'Could not check for the update. Use Extensions below.' }));
+    return true;
+  }
+  if (message.type === 'GD_OPEN_EXTENSIONS') {
+    void chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` });
+    sendResponse({ ok: true });
+    return false;
+  }
   if (message.type === 'GD_OPEN_GUIDE') {
     // The guide lives in GrowDesk, so it always matches the current version; not connected yet
     // means there's nowhere to open it from, so show the settings instead.
@@ -205,6 +233,11 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendRespo
             bundle = await loadBundle();
           } catch (error) {
             await reply({ ok: false, session: null, bundle: await cachedBundle(), error: errorText(error) });
+            return;
+          }
+          // An out-of-date toolbar may not match GrowDesk's rules: capturing waits for the update.
+          if (updateRequired(bundle, chrome.runtime.getManifest().version)) {
+            await reply({ ok: false, session: null, bundle, error: `Update GrowDesk Capture to ${bundle.latest!.version} first: click Update.` });
             return;
           }
           const session = createSession(platform);

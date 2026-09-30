@@ -12,13 +12,38 @@ export function UpdateNotice({
   current,
   installType,
   onReload,
+  onUpdateNow,
+  onOpenExtensions,
 }: {
   latest: LatestRelease;
   current: string;
   installType?: string;
   onReload: () => void;
+  /** Resolves with an error to show, or null once Chrome is installing it. */
+  onUpdateNow: () => Promise<string | null>;
+  onOpenExtensions: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  // Opens by itself: START stays blocked until the update is installed.
+  const [open, setOpen] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const updateNow = async () => {
+    setUpdating(true);
+    setError(null);
+    const problem = await onUpdateNow();
+    // On success the extension reloads and this tab refreshes, so only failures come back.
+    if (problem) {
+      setUpdating(false);
+      setError(problem);
+    }
+  };
+
+  const extensionsLink = (
+    <button type="button" className="gd-link gd-update-link" onClick={onOpenExtensions}>
+      chrome://extensions
+    </button>
+  );
   const wrap = useRef<HTMLSpanElement>(null);
   const automatic = installType === 'admin';
 
@@ -47,13 +72,23 @@ export function UpdateNotice({
           <p className="gd-pop-head">Update available</p>
           <div className="gd-pop-body">
             <p>
-              Version <strong>{latest.version}</strong> is ready. This PC has {current}.
+              Version <strong>{latest.version}</strong> is ready. This PC has {current}. Update to start capturing again.
             </p>
             {automatic ? (
-              <p className="gd-pop-hint">
-                This PC gets GrowDesk Capture automatically, so Chrome installs it within a few hours. To update now, open{' '}
-                <strong>chrome://extensions</strong> and click <strong>Update</strong>.
-              </p>
+              <>
+                <button type="button" className="gd-pop-btn gd-pop-btn--primary gd-update-now" onClick={() => void updateNow()} disabled={updating}>
+                  {updating && <span className="gd-spinner" aria-hidden="true" />}
+                  {updating ? 'Updating…' : 'Update now'}
+                </button>
+                {error && (
+                  <p className="gd-update-error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <p className="gd-pop-hint">
+                  Or open {extensionsLink}, turn on <strong>Developer mode</strong> and click <strong>Update</strong>.
+                </p>
+              </>
             ) : (
               <ol className="gd-update-steps">
                 <li>

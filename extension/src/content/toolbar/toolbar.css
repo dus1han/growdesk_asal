@@ -740,6 +740,8 @@
 .gd-update-steps { margin: 10px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.45; }
 .gd-update-steps li + li { margin-top: 8px; }
 .gd-update-link { color: var(--gd-brand-strong); font-weight: 650; }
+.gd-update-now { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; }
+.gd-update-error { margin: 8px 0 0; color: #b42318; font-size: 12px; line-height: 1.4; }
 
 @media (prefers-reduced-motion: reduce) {
   .gd *,

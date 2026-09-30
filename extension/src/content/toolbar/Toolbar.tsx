@@ -4,7 +4,7 @@ import type { ConfigBundle, ConfigField } from '../../types/growdesk';
 import { CaretIcon, CheckIcon, CloseIcon, HelpIcon, LogoMark, PlayIcon, SendIcon } from './icons';
 import { Picker } from './Picker';
 import { UpdateNotice } from './UpdateNotice';
-import { isNewerVersion } from '../../utils/version';
+import { updateRequired } from '../../utils/version';
 
 /** The version running now. */
 const CURRENT_VERSION = chrome.runtime.getManifest().version;
@@ -35,6 +35,8 @@ export interface ToolbarProps {
   installType?: string;
   /** Reload from disk after new files were unzipped over the old ones. */
   onReloadExtension: () => void;
+  onUpdateNow: () => Promise<string | null>;
+  onOpenExtensions: () => void;
 }
 
 /**
@@ -44,6 +46,7 @@ export interface ToolbarProps {
  */
 export function Toolbar(props: ToolbarProps) {
   const { session, bundle, configured, platform, status, busy, errorField } = props;
+  const needsUpdate = updateRequired(bundle, CURRENT_VERSION);
   const active = Boolean(session?.active);
   const fields = enabledFields(bundle);
   const blocker = active ? saveBlocker(session, bundle) : null;
@@ -95,7 +98,9 @@ export function Toolbar(props: ToolbarProps) {
 
         <span className="gd-divider" aria-hidden="true" />
         <span className={`gd-status${shown ? ` gd-status--${shown.tone}` : ''}`} role="status" aria-live="polite" title={shown?.text}>
-          {!configured && !status ? (
+          {needsUpdate && !active && !status ? (
+            'Update GrowDesk Capture to start capturing.'
+          ) : !configured && !status ? (
             <>
               Not connected to GrowDesk.{' '}
               <button type="button" className="gd-link" onClick={props.onOpenSettings}>
@@ -107,8 +112,15 @@ export function Toolbar(props: ToolbarProps) {
           )}
         </span>
 
-        {bundle?.latest && isNewerVersion(bundle.latest.version, CURRENT_VERSION) && (
-          <UpdateNotice latest={bundle.latest} current={CURRENT_VERSION} installType={props.installType} onReload={props.onReloadExtension} />
+        {needsUpdate && bundle?.latest && (
+          <UpdateNotice
+            latest={bundle.latest}
+            current={CURRENT_VERSION}
+            installType={props.installType}
+            onReload={props.onReloadExtension}
+            onUpdateNow={props.onUpdateNow}
+            onOpenExtensions={props.onOpenExtensions}
+          />
         )}
         <button type="button" className="gd-icon-btn gd-icon-btn--help" onClick={props.onOpenGuide} title="How to use GrowDesk Capture" aria-label="How to use GrowDesk Capture">
           <HelpIcon />
@@ -136,8 +148,14 @@ export function Toolbar(props: ToolbarProps) {
             type="button"
             className="gd-btn"
             onClick={props.onStart}
-            disabled={busy || !configured}
-            title={configured ? 'Start capturing a lead' : 'Connect GrowDesk Capture first (click the GrowDesk logo or Connect)'}
+            disabled={busy || !configured || needsUpdate}
+            title={
+              !configured
+                ? 'Connect GrowDesk Capture first (click the GrowDesk logo or Connect)'
+                : needsUpdate
+                  ? 'Update GrowDesk Capture first (click Update)'
+                  : 'Start capturing a lead'
+            }
           >
             {busy ? <span className="gd-spinner" aria-hidden="true" /> : <PlayIcon />}
             START
