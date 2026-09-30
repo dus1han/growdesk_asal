@@ -52,7 +52,7 @@ export default function CaptureToolPage() {
     <>
       <PageHeader
         title="Capture Tool"
-        description="Choose which fields the CRM Capture toolbar collects on WhatsApp Web and Instagram, and their order. Required fields must be captured before STOP can save."
+        description="Choose which fields the GrowDesk Capture toolbar collects on WhatsApp Web and Instagram, and their order. Required fields must be captured before STOP can save."
       />
 
       {isPending ? (

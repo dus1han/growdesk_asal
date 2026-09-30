@@ -17,7 +17,7 @@ The CRM is built in **8 milestones**. Each one ends with both apps building, mig
 | 5 — Payments | **Done** (2026-09-30) |
 | Change password (added) | **Done** (2026-09-30) |
 | 6 — Dashboard | **Done** (2026-09-30) |
-| 7 — Capture API | **Done** (2026-09-30), toolbar not yet connected |
+| 7 — Capture API + toolbar | **Done** (2026-09-30) |
 | 8 — Polish | Next |
 
 ### Environment as built
@@ -218,9 +218,13 @@ Frontend
     6. Write audit entry naming the connection; return `customerId` and any warnings
 - [x] Examples for every capture endpoint: [docs/CAPTURE_API.md](docs/CAPTURE_API.md)
 
-**Still to do before the toolbar can send leads:**
-- The toolbar (CHExt) only sends over **HTTPS**; the CRM is on plain HTTP (`ip:3110`). Needs a domain + TLS (Caddy).
-- A GrowDesk destination in the toolbar: token exchange, form built from `/api/capture/config`, created/updated message.
+**Toolbar (CHExt, branch `growdesk-capture`, v1.0.0):** GrowDesk-branded, connects with a
+connection's client ID + secret over **http or https**, builds its fields from
+`/api/capture/config` and refreshes them automatically (load, tab focus, every minute, before
+saving). Verified end to end against the live server over plain HTTP.
+
+**Later:** move GrowDesk to a domain with HTTPS. Over plain HTTP the client secret and leads are
+not encrypted in transit (the toolbar's settings page warns about this).
 
 ### Milestone 8 — Polish (§46–§49, §54, §64)
 - [ ] Every screen: loading, empty, error and success states

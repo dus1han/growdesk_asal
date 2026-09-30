@@ -1,57 +1,31 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronRight } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, ChevronRight, Play, X } from "lucide-react";
+import { LogoMark } from "@/components/ui/logo";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { CaptureField } from "@/types/admin";
 
 /**
- * Faithful preview of the CRM Capture Chrome extension (CHExt): a 48px toolbar pinned to the
- * top of WhatsApp Web / Instagram, with values captured by highlighting text and choosing
- * "CRM Capture → Set as …" from the right-click menu. Colours, sizes and wording follow
+ * Faithful preview of the GrowDesk Capture Chrome extension (CHExt, branch growdesk-capture): a
+ * 48px toolbar pinned to the top of WhatsApp Web / Instagram. Text fields are filled by
+ * highlighting text and choosing "GrowDesk Capture → Set as …" from the right-click menu; list,
+ * date and yes/no fields open a picker on the toolbar. Colours, sizes and wording follow
  * CHExt/src/content/toolbar/toolbar.css and Toolbar.tsx.
  */
-
-/** The toolbar's own short labels for built-in fields (Toolbar.tsx). Custom fields use their name. */
-const TOOLBAR_LABELS: Record<string, string> = {
-  name: "Name",
-  whatsapp: "Number",
-  instagram: "Insta",
-  secondary_phone: "2nd Number",
-  treatments: "Treatments",
-  lead_source: "Source",
-};
-
-/** Context-menu wording for built-ins (contextMenus.ts). */
-const MENU_LABELS: Record<string, string> = {
-  name: "Set as Name",
-  whatsapp: "Set as Number",
-  instagram: "Set as Insta Name",
-};
 
 /** Example values for the "capturing" state. */
 const SAMPLE_VALUES: Record<string, string> = {
   name: "Sarah Fernando",
   whatsapp: "+971 50 123 4567",
+  treatments: "Botox",
 };
 
-/** Pick-list fields can't come from highlighted text; the toolbar will offer a picker for them. */
-const PICK_TYPES = new Set(["dropdown", "multiselect", "boolean"]);
+/** Fields chosen on the toolbar rather than highlighted (CHExt fieldKind). */
+const PICK_TYPES = new Set(["dropdown", "multiselect", "boolean", "date"]);
 
-const toolbarLabel = (f: CaptureField) => TOOLBAR_LABELS[f.key] ?? f.label;
-
-// Light-theme tokens from toolbar.css.
-const T = {
-  bg: "#ffffff",
-  border: "#e2e6ec",
-  text: "#1c2430",
-  muted: "#6b7686",
-  accent: "#1a6dd6",
-  success: "#10793f",
-  danger: "#c62f38",
-  chip: "#f2f4f7",
-};
+const menuLabel = (f: CaptureField) => (f.type === "textarea" ? `Add to ${f.label}` : `Set as ${f.label}`);
 
 /** The preview is laid out at a real laptop width, then scaled to fit, so nothing reflows. */
 const DESIGN_WIDTH = 1366;
@@ -80,7 +54,7 @@ export function CaptureToolbarPreview({ fields }: { fields: CaptureField[] }) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted">Preview</p>
-          <p className="mt-0.5 text-xs text-muted">The CRM Capture toolbar as it appears at the top of WhatsApp Web.</p>
+          <p className="mt-0.5 text-xs text-muted">The GrowDesk Capture toolbar as it appears at the top of WhatsApp Web.</p>
         </div>
         <div className="inline-flex rounded-xl bg-surface-muted p-1 text-xs font-medium" role="tablist" aria-label="Toolbar state">
           {[
@@ -122,99 +96,106 @@ export function CaptureToolbarPreview({ fields }: { fields: CaptureField[] }) {
           </div>
 
           {/* The toolbar */}
-          <div className="overflow-hidden">
-            <div
-              className="flex h-12 items-center gap-3.5 px-3.5"
-              style={{
-                background: T.bg,
-                borderBottom: `1px solid ${T.border}`,
-                boxShadow: "0 1px 3px rgba(16,24,40,0.08)",
-                color: T.text,
-                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                fontSize: 13,
-              }}
-            >
-              <span className="whitespace-nowrap text-[13px]" style={{ fontWeight: 650, letterSpacing: "0.01em" }}>
-                CRM Capture
-              </span>
-              <Divider />
+          <div
+            className="relative flex h-12 items-center gap-3 border-b border-line bg-white pl-3.5 pr-3"
+            style={{ boxShadow: "0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -8px rgb(15 23 42 / 0.12)" }}
+          >
+            <motion.span
+              className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-[#7c7cff] via-brand to-accent"
+              initial={false}
+              animate={{ opacity: capturing ? 1 : 0 }}
+            />
+            <span className="flex shrink-0 items-center gap-2">
+              <LogoMark className="size-6" />
+              <span className="text-sm font-bold tracking-tight text-foreground">GrowDesk</span>
+              <span className="text-xs font-medium text-muted">Capture</span>
+            </span>
+            <Divider />
 
-              <AnimatePresence mode="wait" initial={false}>
-                {capturing ? (
-                  <motion.span
-                    key="active"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs"
-                    style={{ background: "rgba(16,121,63,0.1)", color: T.success, fontWeight: 550 }}
-                  >
-                    <span className="size-[7px] rounded-full bg-current" />
-                    ACTIVE
-                  </motion.span>
-                ) : (
-                  <motion.span
-                    key="idle"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="inline-flex h-6 items-center whitespace-nowrap rounded-full px-2.5 text-xs"
-                    style={{ background: T.chip, color: T.muted, fontWeight: 550 }}
-                  >
-                    WhatsApp
-                  </motion.span>
-                )}
-              </AnimatePresence>
-              <Divider />
+            <AnimatePresence mode="wait" initial={false}>
+              {capturing ? (
+                <motion.span
+                  key="active"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-brand-soft px-2.5 text-xs font-semibold text-brand-strong"
+                >
+                  <span className="size-[7px] rounded-full bg-brand" />
+                  Capturing
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="idle"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-full bg-surface-muted px-2.5 text-xs font-semibold text-muted"
+                >
+                  WhatsApp
+                </motion.span>
+              )}
+            </AnimatePresence>
+            <Divider />
 
-              <motion.span layout className="flex items-center gap-4">
-                <AnimatePresence initial={false}>
-                  {fields.map((f) => {
-                    const value = capturing ? SAMPLE_VALUES[f.key] : undefined;
-                    const set = Boolean(value);
-                    return (
-                      <motion.span
-                        key={f.key}
-                        layout
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 4 }}
-                        transition={{ duration: 0.18 }}
-                        className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px]"
-                        style={{ color: set ? T.text : T.muted, fontWeight: 500 }}
-                      >
-                        <span
-                          className="inline-flex size-4 items-center justify-center text-xs"
-                          style={set ? { color: T.success, fontWeight: 700 } : undefined}
-                        >
-                          {set ? "✓" : "○"}
-                        </span>
-                        {toolbarLabel(f)}
-                        {f.isRequired && <span style={{ color: T.danger }}>*</span>}
-                        {PICK_TYPES.has(f.type) && <span style={{ color: T.muted }}>▾</span>}
-                        {set && (
-                          <span className="max-w-[130px] truncate text-xs" style={{ color: T.muted }}>
-                            {value}
-                          </span>
+            <motion.span layout className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+              <AnimatePresence initial={false}>
+                {fields.map((f) => {
+                  const value = capturing ? SAMPLE_VALUES[f.key] : undefined;
+                  const set = Boolean(value);
+                  return (
+                    <motion.span
+                      key={f.key}
+                      layout
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.18 }}
+                      className={cn(
+                        "inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border pl-[7px] pr-2.5 text-[12.5px] font-medium",
+                        set ? "border-brand/25 bg-brand-soft text-foreground" : "border-line bg-white text-muted",
+                        !capturing && "opacity-75",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-flex size-4 shrink-0 items-center justify-center rounded-full",
+                          set ? "bg-gradient-to-br from-brand to-accent text-white" : "border-[1.5px] border-current opacity-55",
                         )}
-                      </motion.span>
-                    );
-                  })}
-                </AnimatePresence>
-              </motion.span>
-              <Divider />
+                      >
+                        {set && <Check className="size-2.5" strokeWidth={3.5} />}
+                      </span>
+                      {f.label}
+                      {f.isRequired && !set && <span className="-ml-1 font-bold text-danger">*</span>}
+                      {set && <span className="max-w-[140px] truncate text-xs text-muted">{value}</span>}
+                      {PICK_TYPES.has(f.type) && capturing && <ChevronDown className="-mr-0.5 size-3 text-muted" />}
+                    </motion.span>
+                  );
+                })}
+              </AnimatePresence>
+            </motion.span>
+            <Divider />
 
-              <span className="min-w-[180px] flex-1 truncate text-[12.5px]" style={{ color: T.muted, fontWeight: 500 }}>
-                {capturing ? "Number captured" : ""}
-              </span>
+            <span className="min-w-[120px] flex-1 truncate text-[12.5px] font-medium text-success">
+              {capturing ? "WhatsApp Number: +971 50 123 4567" : ""}
+            </span>
 
-              <span
-                className="inline-flex h-[30px] min-w-[82px] items-center justify-center rounded-md px-4 text-[12.5px] text-white"
-                style={{ background: capturing ? T.danger : T.accent, fontWeight: 650, letterSpacing: "0.04em" }}
-              >
-                {capturing ? "STOP" : "START"}
+            {capturing && (
+              <span className="flex size-[30px] shrink-0 items-center justify-center rounded-lg text-muted">
+                <X className="size-4" />
               </span>
-            </div>
+            )}
+            <span
+              className={cn(
+                "inline-flex h-8 min-w-[88px] shrink-0 items-center justify-center gap-1.5 rounded-[10px] px-4 text-[12.5px] font-bold tracking-[0.04em] text-white",
+                capturing
+                  ? "bg-gradient-to-r from-brand to-accent shadow-[0_6px_16px_-8px_rgb(20_184_166/0.9)]"
+                  : "bg-gradient-to-r from-[#7c7cff] to-brand shadow-[0_6px_16px_-8px_rgb(91_91_246/0.9)]",
+              )}
+            >
+              {capturing ? <ArrowRight className="size-3.5" strokeWidth={2.6} /> : <Play className="size-3.5" strokeWidth={2.4} />}
+              {capturing ? "STOP" : "START"}
+            </span>
           </div>
 
           {/* WhatsApp Web beneath the toolbar */}
@@ -253,13 +234,13 @@ export function CaptureToolbarPreview({ fields }: { fields: CaptureField[] }) {
                       <p className="px-3 py-1.5 text-[#9aa3af]">Search Google for…</p>
                       <div className="my-1 h-px bg-black/10" />
                       <p className="flex items-center justify-between bg-[#e8f0fe] px-3 py-1.5">
-                        CRM Capture <ChevronRight className="size-3.5" />
+                        GrowDesk Capture <ChevronRight className="size-3.5" />
                       </p>
                     </div>
-                    <div className="-ml-1 mt-[58px] w-48 rounded-md border border-black/10 bg-white py-1 shadow-lg">
+                    <div className="-ml-1 mt-[58px] w-56 rounded-md border border-black/10 bg-white py-1 shadow-lg">
                       {textFields.map((f, i) => (
                         <p key={f.key} className={cn("px-3 py-1.5", i === 0 && "bg-[#e8f0fe]")}>
-                          {MENU_LABELS[f.key] ?? `Set as ${f.label}`}
+                          {menuLabel(f)}
                         </p>
                       ))}
                     </div>
@@ -275,12 +256,12 @@ export function CaptureToolbarPreview({ fields }: { fields: CaptureField[] }) {
 
       <p className="mt-2 text-xs text-muted">
         <span className="text-danger">*</span> required before STOP can save. <span className="font-medium">▾</span> pick-list fields are
-        chosen from a list rather than highlighted text.
+        chosen on the toolbar rather than highlighted.
       </p>
     </section>
   );
 }
 
 function Divider() {
-  return <span className="h-5 w-px shrink-0" style={{ background: T.border }} />;
+  return <span className="h-[22px] w-px shrink-0 bg-line" />;
 }

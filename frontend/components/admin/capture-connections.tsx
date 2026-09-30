@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import type { CaptureClient, CaptureClientCreated } from "@/types/admin";
 
 /**
- * The connections the CRM Capture toolbar signs in with: one per PC, each with its own client
+ * The connections the GrowDesk Capture toolbar signs in with: one per PC, each with its own client
  * ID and secret, so a lost or retired PC can be cut off without touching the others.
  */
 export function CaptureConnections() {
@@ -49,7 +49,7 @@ export function CaptureConnections() {
         <EmptyState
           icon={Plug}
           title="No connections yet"
-          description="Add one for each PC that runs the CRM Capture toolbar, then enter its details in the toolbar's options."
+          description="Add one for each PC that runs the GrowDesk Capture toolbar, then enter its details in the toolbar's settings."
           className="py-10"
         />
       ) : (
@@ -131,7 +131,7 @@ function AddConnectionDrawer({ open, onClose }: { open: boolean; onClose: () => 
       open={open}
       onOpenChange={(o) => !o && close()}
       title={created ? "Connection ready" : "Add connection"}
-      description={created ? `Enter these in the CRM Capture options on ${created.client.name}.` : "One connection per PC that runs the toolbar."}
+      description={created ? `Enter these in the GrowDesk Capture settings on ${created.client.name}.` : "One connection per PC that runs the toolbar."}
       footer={
         created ? (
           <Button onClick={close}>Done</Button>
