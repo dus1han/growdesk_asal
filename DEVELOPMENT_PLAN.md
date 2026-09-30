@@ -14,7 +14,8 @@ The CRM is built in **8 milestones**. Each one ends with both apps building, mig
 | 2 — Administration | **Done** (2026-09-30) |
 | 3 — Customers | **Done** (2026-09-30) |
 | 4 — Bookings and calendar | **Done** (2026-09-30) |
-| 5 — Payments | Next |
+| 5 — Payments | **Done** (2026-09-30) |
+| 6 — Dashboard | Next (after change password) |
 
 ### Environment as built
 
@@ -176,9 +177,13 @@ Frontend
 **Done when:** every state transition and the next-treatment rule have passing backend tests.
 
 ### Milestone 5 — Payments (§28)
-- [ ] `payments` table: booking, customer, amount, status (Paid / Pending / Waived), method, date, created by
-- [ ] Payment recorded on consultation completion
-- [ ] Payments page with filters; payment history on the customer profile
+- [x] `payments` table: booking, customer, amount, status (Paid / Pending / Waived), method, date, created by
+- [x] Payment recorded on consultation completion
+- [x] Payments page with filters; payment history on the customer profile
+- [x] Record a payment against a pending consultation (from the Payments page or the booking drawer)
+- [x] Summary cards (collected, outstanding, waived) and Excel export of the filtered rows
+
+**Notes:** payments are append-only. Settling a pending consultation adds a new Paid entry; the latest entry is the booking's current state. The list shows current entries by default, with a "Full history" switch for superseded ones.
 
 ### Milestone 6 — Dashboard (§10, §11, §29)
 - [ ] `GET /api/dashboard` — real data only

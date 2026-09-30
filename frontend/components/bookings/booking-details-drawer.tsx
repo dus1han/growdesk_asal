@@ -23,6 +23,7 @@ import { formatDateTime } from "@/lib/format";
 import { can, Permission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import type { BookingDetail } from "@/types/bookings";
+import { RecordPaymentDrawer } from "@/components/payments/record-payment-drawer";
 import { BookingFormDrawer } from "./booking-form-drawer";
 import { BookingStatusBadge, formatMoney, formatTime, hhmm } from "./booking-status";
 import { DaySchedule } from "./day-schedule";
@@ -131,7 +132,9 @@ function Details({
   const { data: locale } = useLocale();
   const { noShow } = useBookingActions();
   const [confirmNoShow, setConfirmNoShow] = useState(false);
+  const [recording, setRecording] = useState(false);
   const canManage = can(session?.user, Permission.BookingsManage);
+  const canRecordPayment = can(session?.user, Permission.PaymentsManage);
   const canComplete = can(session?.user, Permission.BookingsComplete);
   const isBooked = booking.status === "Booked";
   const payment = booking.payments[0];
@@ -184,12 +187,24 @@ function Details({
             <p className="text-sm font-semibold text-emerald-800">Consultation charge</p>
             <p className="font-display text-lg font-bold">{formatMoney(booking.consultationCharge, locale?.currency)}</p>
           </div>
-          {payment && (
-            <p className="text-sm text-foreground/80">
-              <span className="font-semibold">{payment.status}</span>
-              {payment.method && ` · ${payment.method.name}`}
-              {payment.paymentDate && ` · ${formatDateTime(payment.paymentDate)}`}
-            </p>
+          {booking.payments.length > 0 && (
+            <ul className="space-y-1.5">
+              {booking.payments.map((p, i) => (
+                <li key={p.id} className={cn("flex items-center justify-between gap-2 text-sm", i > 0 && "text-muted")}>
+                  <span>
+                    <span className="font-semibold">{p.status}</span>
+                    {p.method && ` · ${p.method.name}`}
+                    {p.paymentDate && ` · ${formatDateTime(p.paymentDate)}`}
+                  </span>
+                  {i > 0 && <span className="text-xs">earlier</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {payment?.status === "Pending" && canRecordPayment && (
+            <Button size="sm" onClick={() => setRecording(true)}>
+              Record payment
+            </Button>
           )}
           {booking.nextTreatment && booking.nextTreatmentDate && (
             <p className="text-sm">
@@ -275,6 +290,10 @@ function Details({
       )}
 
       <p className="text-xs text-muted">Booked {formatDateTime(booking.createdAt)}</p>
+      <RecordPaymentDrawer
+        pending={recording && payment ? { bookingId: booking.id, customerName: booking.customer.name, amount: payment.amount } : null}
+        onClose={() => setRecording(false)}
+      />
     </div>
   );
 }

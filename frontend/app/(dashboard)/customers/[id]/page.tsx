@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { BookingDetailsDrawer } from "@/components/bookings/booking-details-drawer";
 import { BookingFormDrawer } from "@/components/bookings/booking-form-drawer";
 import { CustomerBookingsCard } from "@/components/customers/customer-bookings-card";
+import { CustomerPaymentsCard } from "@/components/customers/customer-payments-card";
 import { CustomerFormDrawer } from "@/components/customers/customer-form-drawer";
 import { StageBadge } from "@/components/customers/stage-badge";
 import { RequirePermission } from "@/components/layout/require-permission";
@@ -58,6 +59,7 @@ function Profile({ id }: { id: number }) {
   const canManage = can(session?.user, Permission.CustomersManage);
   const canBook = can(session?.user, Permission.BookingsManage);
   const canSeeBookings = can(session?.user, Permission.BookingsView);
+  const canSeePayments = can(session?.user, Permission.PaymentsView);
   const [editing, setEditing] = useState(false);
   const [booking, setBooking] = useState(false);
   const [openBookingId, setOpenBookingId] = useState<number | null>(null);
@@ -148,7 +150,10 @@ function Profile({ id }: { id: number }) {
           </Card>
         </div>
 
-        <ActivityCard id={customer.id} />
+        <div className="space-y-6">
+          {canSeePayments && <CustomerPaymentsCard customerId={customer.id} onOpenBooking={setOpenBookingId} />}
+          <ActivityCard id={customer.id} />
+        </div>
       </div>
 
       <CustomerFormDrawer open={editing} onClose={() => setEditing(false)} customer={customer} />

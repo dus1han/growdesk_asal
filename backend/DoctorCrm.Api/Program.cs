@@ -122,6 +122,7 @@ builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<StageAutomation>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<BookingExportService>();
+builder.Services.AddScoped<PaymentService>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 builder.Services.AddControllers(o => o.Filters.Add<ValidationFilter>())
