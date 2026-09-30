@@ -92,3 +92,21 @@ export interface CaptureField {
   isRequired: boolean;
   displayOrder: number;
 }
+
+/** A connection the CRM Capture toolbar signs in with (backend DTOs/CaptureDtos.cs). */
+export interface CaptureClient {
+  id: number;
+  name: string;
+  clientId: string;
+  isActive: boolean;
+  createdAt: string;
+  createdBy: string | null;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+/** Returned once on creation: the secret can't be read again. */
+export interface CaptureClientCreated {
+  client: CaptureClient;
+  clientSecret: string;
+}

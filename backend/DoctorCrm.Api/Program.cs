@@ -36,7 +36,9 @@ builder.Services.AddScoped<DbSeeder>();
 builder.Services.AddOptions<JwtOptions>().BindConfiguration(JwtOptions.Section).ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<AuthCookieOptions>().BindConfiguration(AuthCookieOptions.Section);
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer()
+    .AddJwtBearer(CaptureAuth.Scheme);
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
     .Configure<IOptions<JwtOptions>, IOptions<AuthCookieOptions>>((o, jwt, cookie) =>
     {
@@ -86,12 +88,61 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
         };
     });
 
+// The capture tool: Bearer token in the Authorization header, its own audience, and the
+// connection must still be active (revoking takes effect on the next request).
+builder.Services.AddOptions<JwtBearerOptions>(CaptureAuth.Scheme)
+    .Configure<IOptions<JwtOptions>>((o, jwt) =>
+    {
+        o.MapInboundClaims = false;
+        o.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwt.Value.Issuer,
+            ValidateAudience = true,
+            ValidAudience = CaptureAuth.Audience(jwt.Value),
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = TokenService.GetSigningKey(jwt.Value),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+            NameClaimType = JwtRegisteredClaimNames.Name,
+        };
+        o.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async ctx =>
+            {
+                var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var id = ctx.Principal?.GetCaptureClientId();
+                var client = id is null ? null : await db.CaptureClients.SingleOrDefaultAsync(c => c.Id == id && c.IsActive);
+                if (client is null)
+                {
+                    ctx.Fail("Capture connection revoked.");
+                    return;
+                }
+                if (client.LastUsedAt is null || client.LastUsedAt < DateTime.UtcNow.AddMinutes(-1))
+                {
+                    client.LastUsedAt = DateTime.UtcNow;
+                    await db.SaveChangesAsync();
+                }
+            },
+            OnChallenge = async ctx =>
+            {
+                ctx.HandleResponse();
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail("Missing, expired or revoked capture token. Request a new one at /api/capture/token."));
+            },
+        };
+    });
+
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
 builder.Services.AddAuthorization(o =>
 {
     // Every endpoint requires a signed-in user unless it opts out with [AllowAnonymous].
     o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+    o.AddPolicy(CaptureAuth.Policy, p => p
+        .AddAuthenticationSchemes(CaptureAuth.Scheme)
+        .RequireAuthenticatedUser()
+        .RequireClaim(CaptureAuth.ClientClaim));
 });
 
 // ---- Rate limiting ------------------------------------------------------------
@@ -107,6 +158,16 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy(RateLimitPolicies.Login, http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = loginPermits, Window = TimeSpan.FromMinutes(1) }));
+
+    // Capture tool: token requests per IP (same limit as sign-in), and API calls per IP. Rate
+    // limiting runs before the capture token is read, so IP is the partition; one PC per connection.
+    o.AddPolicy(RateLimitPolicies.CaptureToken, http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = loginPermits, Window = TimeSpan.FromMinutes(1) }));
+    var capturePermits = builder.Configuration.GetValue("RateLimiting:CapturePerMinute", 120);
+    o.AddPolicy(RateLimitPolicies.Capture, http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = capturePermits, Window = TimeSpan.FromMinutes(1) }));
 });
 
 // ---- Application services ------------------------------------------------------
@@ -126,6 +187,9 @@ builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<BookingExportService>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<DashboardService>();
+builder.Services.AddSingleton<CaptureTokenService>();
+builder.Services.AddScoped<CaptureClientService>();
+builder.Services.AddScoped<CaptureService>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 builder.Services.AddControllers(o => o.Filters.Add<ValidationFilter>())

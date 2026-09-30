@@ -17,6 +17,23 @@ public class LoginRequestValidator : AbstractValidator<LoginRequest>
     }
 }
 
+public class CaptureTokenRequestValidator : AbstractValidator<CaptureTokenRequest>
+{
+    public CaptureTokenRequestValidator()
+    {
+        RuleFor(x => x.ClientId).NotEmpty().WithMessage("Enter the client ID.").MaximumLength(64);
+        RuleFor(x => x.ClientSecret).NotEmpty().WithMessage("Enter the client secret.").MaximumLength(200);
+    }
+}
+
+public class CreateCaptureClientRequestValidator : AbstractValidator<CreateCaptureClientRequest>
+{
+    public CreateCaptureClientRequestValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().WithMessage("Give the connection a name, e.g. Reception PC.").MaximumLength(100);
+    }
+}
+
 public class ChangePasswordRequestValidator : AbstractValidator<ChangePasswordRequest>
 {
     public ChangePasswordRequestValidator()

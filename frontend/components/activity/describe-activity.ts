@@ -35,6 +35,14 @@ const FIELD_NAMES: Record<string, string> = {
 
 /** How an audit entry reads in a timeline: icon, title, optional detail and a colour. */
 export function describeActivity(a: Pick<Activity, "action" | "details">): ActivityView {
+  const view = describeAction(a);
+  const d = a.details ?? {};
+  if (d.source !== "capture") return view;
+  const via = `Captured${typeof d.client === "string" ? ` on ${d.client}` : ""}`;
+  return { ...view, detail: view.detail ? `${view.detail} · ${via}` : via };
+}
+
+function describeAction(a: Pick<Activity, "action" | "details">): ActivityView {
   const d = a.details ?? {};
   switch (a.action) {
     case "Customer Created":

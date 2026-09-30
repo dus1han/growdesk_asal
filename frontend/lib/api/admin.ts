@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api/client";
 import type {
   AdminUser,
+  CaptureClient,
+  CaptureClientCreated,
   CaptureField,
   CreateUser,
   CustomField,
@@ -184,4 +186,25 @@ export function useSaveCaptureFields() {
       api.put<CaptureField[]>("/admin/capture-fields", { fields }),
     onSuccess: (data) => qc.setQueryData(["capture-fields"], data),
   });
+}
+
+// ---- Capture tool connections -------------------------------------------------------------------
+
+export function useCaptureClients() {
+  return useQuery({ queryKey: ["capture-clients"], queryFn: ({ signal }) => api.get<CaptureClient[]>("/admin/capture-clients", { signal }) });
+}
+
+export function useCaptureClientMutations() {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: ["capture-clients"] });
+  return {
+    create: useMutation({
+      mutationFn: (name: string) => api.post<CaptureClientCreated>("/admin/capture-clients", { name }),
+      onSuccess: refresh,
+    }),
+    revoke: useMutation({
+      mutationFn: (id: number) => api.post<null>(`/admin/capture-clients/${id}/revoke`),
+      onSuccess: refresh,
+    }),
+  };
 }

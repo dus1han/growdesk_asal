@@ -26,6 +26,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<BookingTreatment> BookingTreatments => Set<BookingTreatment>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<CaptureClient> CaptureClients => Set<CaptureClient>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -197,6 +198,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasKey(x => x.Key);
             e.Property(x => x.Key).HasMaxLength(100);
             e.Property(x => x.Value).HasMaxLength(2000).IsRequired();
+        });
+
+        b.Entity<CaptureClient>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.Property(x => x.ClientId).HasMaxLength(64).IsRequired();
+            e.HasIndex(x => x.ClientId).IsUnique();
+            e.Property(x => x.SecretHash).HasMaxLength(128).IsRequired();
+            e.HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.SetNull);
         });
 
         b.Entity<AuditLog>(e =>

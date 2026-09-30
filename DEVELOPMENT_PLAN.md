@@ -17,7 +17,8 @@ The CRM is built in **8 milestones**. Each one ends with both apps building, mig
 | 5 — Payments | **Done** (2026-09-30) |
 | Change password (added) | **Done** (2026-09-30) |
 | 6 — Dashboard | **Done** (2026-09-30) |
-| 7 — Capture API | Next |
+| 7 — Capture API | **Done** (2026-09-30), toolbar not yet connected |
+| 8 — Polish | Next |
 
 ### Environment as built
 
@@ -205,16 +206,21 @@ Frontend
 **Notes:** cancelled and rescheduled bookings are not counted as consultations. "Potential" means the Interested and Follow-up stages.
 
 ### Milestone 7 — Capture API (§30–§36)
-- [ ] Client-credential token endpoint; rate limiting; audit logging
-- [ ] `GET /api/capture/config | treatments | stages | sources | custom-fields`
-- [ ] `POST /api/capture/customers`:
-    1. Validate fields against capture configuration
-    2. Normalise WhatsApp number
-    3. Find or create customer → return `action: "created" | "updated"`
-    4. Merge treatment interests (don't replace)
-    5. Apply stage; save custom fields
-    6. Write audit entry; return `customerId`
-- [ ] Swagger examples for every capture endpoint
+- [x] Connections (Administration → Capture Tool): one per PC, client ID + secret shown once, revoke takes effect on the next request
+- [x] Client-credential token endpoint (`POST /api/capture/token`, 15-minute Bearer token, own audience); rate limiting; audit logging
+- [x] `GET /api/capture/config | treatments | stages | sources | custom-fields`
+- [x] `POST /api/capture/customers`:
+    1. Validate fields against capture configuration (switched-off fields are ignored)
+    2. Normalise WhatsApp number and Instagram name
+    3. Find by WhatsApp, then Instagram, or create → return `action: "created" | "updated"`
+    4. Merge treatment interests (don't replace); append notes; never clear recorded data
+    5. Apply stage (only while still a lead); save custom fields; set last contact
+    6. Write audit entry naming the connection; return `customerId` and any warnings
+- [x] Examples for every capture endpoint: [docs/CAPTURE_API.md](docs/CAPTURE_API.md)
+
+**Still to do before the toolbar can send leads:**
+- The toolbar (CHExt) only sends over **HTTPS**; the CRM is on plain HTTP (`ip:3110`). Needs a domain + TLS (Caddy).
+- A GrowDesk destination in the toolbar: token exchange, form built from `/api/capture/config`, created/updated message.
 
 ### Milestone 8 — Polish (§46–§49, §54, §64)
 - [ ] Every screen: loading, empty, error and success states

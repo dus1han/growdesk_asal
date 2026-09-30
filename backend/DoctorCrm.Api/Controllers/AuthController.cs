@@ -89,4 +89,6 @@ public class AuthController(AuthService auth, IOptions<AuthCookieOptions> cookie
 public static class RateLimitPolicies
 {
     public const string Login = "login";
+    public const string CaptureToken = "capture-token";
+    public const string Capture = "capture";
 }

@@ -84,20 +84,24 @@ function Bookings() {
                   type="button"
                   role="tab"
                   aria-selected={view === id}
+                  aria-label={label}
+                  title={label}
                   onClick={() => setView(id)}
-                  className={cn("relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors", view === id ? "text-brand-strong" : "text-muted hover:text-foreground")}
+                  className={cn("relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-colors sm:px-3", view === id ? "text-brand-strong" : "text-muted hover:text-foreground")}
                 >
                   {view === id && (
                     <motion.span layoutId="bookings-view" className="absolute inset-0 rounded-lg bg-brand-soft" transition={{ type: "spring", stiffness: 500, damping: 38 }} />
                   )}
                   <Icon className="relative size-4" />
-                  <span className="relative">{label}</span>
+                  <span className="relative hidden sm:inline">{label}</span>
                 </button>
               ))}
             </div>
             {canBook && (
-              <Button onClick={() => setBooking({})}>
-                <Plus className="size-4" /> Book consultation
+              // Icon only on phones, so the title keeps its room beside the actions.
+              <Button onClick={() => setBooking({})} aria-label="Book consultation" title="Book consultation" className="px-3 sm:px-4">
+                <Plus className="size-4" />
+                <span className="hidden sm:inline">Book consultation</span>
               </Button>
             )}
           </>
