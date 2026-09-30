@@ -3,10 +3,10 @@
 /** The GrowDesk Capture Chrome extension GrowDesk currently offers. */
 export const CAPTURE_EXTENSION = {
   id: "mnhjjndckpjiglmdlpelboiebdjcfaid",
-  version: "1.0.7",
+  version: "1.0.8",
   download: "/downloads/growdesk-capture.zip",
   crx: "/capture/growdesk-capture.crx",
   updateManifest: "/capture/update.xml",
   /** Where this build looks for updates (set at build time). */
-  builtUpdateUrl: "http://localhost:8787/update.xml",
+  builtUpdateUrl: "http://169.58.92.105:3110/capture/update.xml",
 } as const;

@@ -25,7 +25,8 @@ public class CaptureController(CaptureClientService clients, CaptureService capt
     [EnableRateLimiting(RateLimitPolicies.CaptureToken)]
     public async Task<ActionResult<ApiResponse<CaptureTokenDto>>> Token(CaptureTokenRequest request, CancellationToken ct)
     {
-        var token = await clients.IssueTokenAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
+        var version = Request.Headers["X-GrowDesk-Capture-Version"].FirstOrDefault()?.Trim();
+        var token = await clients.IssueTokenAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), version, ct);
         return token is null
             ? Unauthorized(ApiResponse.Fail("Invalid client ID or secret, or the connection was revoked."))
             : Ok(ApiResponse<CaptureTokenDto>.Ok(token));

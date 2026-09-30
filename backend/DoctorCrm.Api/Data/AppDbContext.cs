@@ -206,6 +206,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.ClientId).HasMaxLength(64).IsRequired();
             e.HasIndex(x => x.ClientId).IsUnique();
             e.Property(x => x.SecretHash).HasMaxLength(128).IsRequired();
+            e.Property(x => x.ExtensionVersion).HasMaxLength(20);
             e.HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.SetNull);
         });
 

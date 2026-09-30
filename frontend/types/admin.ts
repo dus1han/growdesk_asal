@@ -103,6 +103,8 @@ export interface CaptureClient {
   createdBy: string | null;
   lastUsedAt: string | null;
   revokedAt: string | null;
+  /** The toolbar version this PC last connected with. */
+  extensionVersion: string | null;
 }
 
 /** Returned once on creation: the secret can't be read again. */

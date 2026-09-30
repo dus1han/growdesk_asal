@@ -15,7 +15,9 @@ import { Badge, Field, Input } from "@/components/ui/form-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toastError, useCaptureClientMutations, useCaptureClients } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
+import { CAPTURE_EXTENSION } from "@/lib/capture-extension";
 import { copyText } from "@/lib/clipboard";
+import { isNewerVersion } from "@/lib/version";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CaptureClient, CaptureClientCreated } from "@/types/admin";
@@ -85,6 +87,9 @@ function ConnectionRow({ client }: { client: CaptureClient }) {
         <p className="flex flex-wrap items-center gap-2">
           <span className="truncate font-semibold">{client.name}</span>
           {client.isActive ? <Badge tone="success">Active</Badge> : <Badge tone="muted">Revoked</Badge>}
+          {client.isActive && client.extensionVersion && isNewerVersion(CAPTURE_EXTENSION.version, client.extensionVersion) && (
+            <Badge tone="warning">Update available</Badge>
+          )}
         </p>
         <p className="mt-0.5 truncate text-xs text-muted">
           <span className="font-mono">{client.clientId}</span>
@@ -92,6 +97,7 @@ function ConnectionRow({ client }: { client: CaptureClient }) {
           {client.isActive ? (
             <span title={client.lastUsedAt ? formatDateTime(client.lastUsedAt) : undefined}>
               {client.lastUsedAt ? `Last used ${formatRelative(client.lastUsedAt)}` : "Not used yet"}
+              {client.extensionVersion && ` · v${client.extensionVersion}`}
             </span>
           ) : (
             <span>Revoked {formatRelative(client.revokedAt)}</span>

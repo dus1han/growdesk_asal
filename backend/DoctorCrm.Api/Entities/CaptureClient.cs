@@ -22,5 +22,8 @@ public class CaptureClient
     public int? CreatedById { get; set; }
     public User? CreatedBy { get; set; }
     public DateTime? LastUsedAt { get; set; }
+
+    /// <summary>The toolbar version this PC last connected with, e.g. "1.0.7".</summary>
+    public string? ExtensionVersion { get; set; }
     public DateTime? RevokedAt { get; set; }
 }

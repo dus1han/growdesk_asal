@@ -15,7 +15,7 @@ public class CaptureClientService(AppDbContext db, AuditService audit, CaptureTo
         await db.CaptureClients.AsNoTracking()
             .OrderByDescending(c => c.IsActive).ThenByDescending(c => c.CreatedAt)
             .Select(c => new CaptureClientDto(c.Id, c.Name, c.ClientId, c.IsActive, c.CreatedAt,
-                c.CreatedBy != null ? c.CreatedBy.FullName : null, c.LastUsedAt, c.RevokedAt))
+                c.CreatedBy != null ? c.CreatedBy.FullName : null, c.LastUsedAt, c.RevokedAt, c.ExtensionVersion))
             .ToListAsync(ct);
 
     public async Task<CaptureClientCreatedDto> CreateAsync(CreateCaptureClientRequest request, int? userId, CancellationToken ct)
@@ -55,7 +55,8 @@ public class CaptureClientService(AppDbContext db, AuditService audit, CaptureTo
     }
 
     /// <summary>Returns null for any failure, so a caller can't tell an unknown ID from a wrong secret.</summary>
-    public async Task<CaptureTokenDto?> IssueTokenAsync(CaptureTokenRequest request, string? ipAddress, CancellationToken ct)
+    /// <param name="extensionVersion">The toolbar's version (X-GrowDesk-Capture-Version), kept for the Connections list.</param>
+    public async Task<CaptureTokenDto?> IssueTokenAsync(CaptureTokenRequest request, string? ipAddress, string? extensionVersion, CancellationToken ct)
     {
         var clientId = request.ClientId.Trim();
         var client = await db.CaptureClients.SingleOrDefaultAsync(c => c.ClientId == clientId, ct);
@@ -71,6 +72,8 @@ public class CaptureClientService(AppDbContext db, AuditService audit, CaptureTo
         }
 
         client!.LastUsedAt = DateTime.UtcNow;
+        if (extensionVersion is not null && System.Text.RegularExpressions.Regex.IsMatch(extensionVersion, @"^\d{1,4}(\.\d{1,5}){0,3}$"))
+            client.ExtensionVersion = extensionVersion;
         await db.SaveChangesAsync(ct);
         var (token, expiresIn) = tokens.CreateToken(client.Id, client.Name);
         return new CaptureTokenDto(token, "Bearer", expiresIn);

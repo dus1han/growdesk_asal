@@ -12,7 +12,9 @@ export type ContentMessage =
   | { type: 'GD_DISCARD' }
   | { type: 'GD_OPEN_SETTINGS' }
   /** Opens GrowDesk's animated "How to use GrowDesk Capture" guide in a new tab. */
-  | { type: 'GD_OPEN_GUIDE' };
+  | { type: 'GD_OPEN_GUIDE' }
+  /** Reload the extension from disk after new files were unzipped over it (Load unpacked installs). */
+  | { type: 'GD_RELOAD_EXTENSION' };
 
 /** Reply to state-changing messages. */
 export interface StateResponse {
@@ -22,6 +24,8 @@ export interface StateResponse {
   bundle: ConfigBundle | null;
   /** True when a server and credentials are saved in the settings. */
   configured: boolean;
+  /** How Chrome installed this extension: 'admin' (company policy, updates itself), 'development' (Load unpacked), … */
+  installType?: string;
   error?: string;
 }
 

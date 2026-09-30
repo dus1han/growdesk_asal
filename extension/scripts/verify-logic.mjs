@@ -27,6 +27,7 @@ const {
   mergeHighlight,
   normalizeSelection,
   platformFromHostname,
+  isNewerVersion,
   isConfigured,
   normalizeServer,
   originPattern,
@@ -123,6 +124,13 @@ check('Server address: bare IP means http, a name means https', () => {
   assert.equal(originPattern('http://169.58.92.105:3110'), 'http://169.58.92.105:3110/*');
   assert.equal(isConfigured({ serverUrl: '169.58.92.105:3110', clientId: 'gdc_1', clientSecret: 'gds_2' }), true);
   assert.equal(isConfigured({ serverUrl: '169.58.92.105:3110', clientId: '', clientSecret: 'gds_2' }), false);
+});
+check('Update notice: version comparison', () => {
+  assert.equal(isNewerVersion('1.0.8', '1.0.7'), true);
+  assert.equal(isNewerVersion('1.0.10', '1.0.9'), true);
+  assert.equal(isNewerVersion('1.1', '1.0.9'), true);
+  assert.equal(isNewerVersion('1.0.7', '1.0.7'), false);
+  assert.equal(isNewerVersion('1.0.6', '1.0.7'), false);
 });
 check('Platform detection', () => {
   assert.equal(platformFromHostname('web.whatsapp.com'), 'WhatsApp');

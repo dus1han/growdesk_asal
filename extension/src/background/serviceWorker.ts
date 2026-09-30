@@ -10,6 +10,7 @@ import { platformFromUrl } from '../utils/platform';
 
 const BUNDLE_KEY = 'growdesk-capture-config';
 const SETTINGS_KEY = 'growdesk-capture-settings';
+const RELOAD_TABS_KEY = 'growdesk-capture-reload-tabs';
 
 /** Pushes state (and an optional flash message) down to one tab's toolbar. */
 async function pushState(tabId: number, session: CaptureSession | null, flash?: string, flashTone: StatePushMessage['flashTone'] = 'success'): Promise<void> {
@@ -48,6 +49,15 @@ async function restoreMenus(): Promise<void> {
 
 chrome.runtime.onInstalled.addListener((details) => {
   void restoreMenus();
+  // Updated from the toolbar's Reload: reopen the capture tabs so they run the new version.
+  if (details.reason === 'update') {
+    void chrome.storage.local.get(RELOAD_TABS_KEY).then(async (stored) => {
+      if (!stored[RELOAD_TABS_KEY]) return;
+      await chrome.storage.local.remove(RELOAD_TABS_KEY);
+      const tabs = await chrome.tabs.query({ url: ['https://web.whatsapp.com/*', 'https://www.instagram.com/*'] });
+      for (const tab of tabs) if (tab.id != null) void chrome.tabs.reload(tab.id);
+    });
+  }
   // First install: nothing works until GrowDesk is connected, so open the settings.
   if (details.reason === 'install') chrome.runtime.openOptionsPage();
 });
@@ -116,10 +126,21 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onMessage.addListener((message: ContentMessage, sender, sendResponse) => {
   const tabId = sender.tab?.id;
   const reply = async (response: Omit<StateResponse, 'configured'> & { configured?: boolean }) =>
-    sendResponse({ configured: isConfigured(await readSettings()), ...response } satisfies StateResponse);
+    sendResponse({
+      configured: isConfigured(await readSettings()),
+      installType: await chrome.management.getSelf().then((s) => s.installType).catch(() => undefined),
+      ...response,
+    } satisfies StateResponse);
 
   if (message.type === 'GD_OPEN_SETTINGS') {
     chrome.runtime.openOptionsPage();
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (message.type === 'GD_RELOAD_EXTENSION') {
+    // After the new files were unzipped over the old ones: reload from disk, then reopen the
+    // WhatsApp / Instagram tabs so they get the new toolbar (see onInstalled).
+    void chrome.storage.local.set({ [RELOAD_TABS_KEY]: true }).then(() => chrome.runtime.reload());
     sendResponse({ ok: true });
     return false;
   }

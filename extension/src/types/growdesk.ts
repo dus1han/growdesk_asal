@@ -42,6 +42,15 @@ export interface ConfigBundle {
   stages: Lookup[];
   sources: Lookup[];
   fetchedAt: string;
+  /** The newest toolbar GrowDesk offers (GET /capture/latest.json); null if unknown. */
+  latest?: LatestRelease | null;
+}
+
+export interface LatestRelease {
+  version: string;
+  /** Download for Load unpacked. */
+  download: string;
+  guide: string;
 }
 
 export interface CaptureRequest {

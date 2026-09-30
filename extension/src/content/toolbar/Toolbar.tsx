@@ -3,6 +3,11 @@ import { displayValue, enabledFields, fieldKind, hasValue, saveBlocker, type Cap
 import type { ConfigBundle, ConfigField } from '../../types/growdesk';
 import { CaretIcon, CheckIcon, CloseIcon, HelpIcon, LogoMark, PlayIcon, SendIcon } from './icons';
 import { Picker } from './Picker';
+import { UpdateNotice } from './UpdateNotice';
+import { isNewerVersion } from '../../utils/version';
+
+/** The version running now. */
+const CURRENT_VERSION = chrome.runtime.getManifest().version;
 
 export interface StatusMessage {
   text: string;
@@ -26,6 +31,10 @@ export interface ToolbarProps {
   onOpenGuide: () => void;
   /** Draw a box around text on the page to capture it into a field (from the field's chip). */
   onDraw: (key: string) => void;
+  /** How Chrome installed the extension (for the update notice). */
+  installType?: string;
+  /** Reload from disk after new files were unzipped over the old ones. */
+  onReloadExtension: () => void;
 }
 
 /**
@@ -98,6 +107,9 @@ export function Toolbar(props: ToolbarProps) {
           )}
         </span>
 
+        {bundle?.latest && isNewerVersion(bundle.latest.version, CURRENT_VERSION) && (
+          <UpdateNotice latest={bundle.latest} current={CURRENT_VERSION} installType={props.installType} onReload={props.onReloadExtension} />
+        )}
         <button type="button" className="gd-icon-btn gd-icon-btn--help" onClick={props.onOpenGuide} title="How to use GrowDesk Capture" aria-label="How to use GrowDesk Capture">
           <HelpIcon />
         </button>

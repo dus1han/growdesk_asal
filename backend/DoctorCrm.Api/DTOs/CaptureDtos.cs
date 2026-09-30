@@ -12,7 +12,9 @@ public record CaptureClientDto(
     DateTime CreatedAt,
     string? CreatedBy,
     DateTime? LastUsedAt,
-    DateTime? RevokedAt);
+    DateTime? RevokedAt,
+    /// <summary>The toolbar version this PC last connected with.</summary>
+    string? ExtensionVersion);
 
 public record CreateCaptureClientRequest(string Name);
 

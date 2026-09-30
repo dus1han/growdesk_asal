@@ -714,6 +714,33 @@
   box-shadow: 0 0 0 9999px rgb(15 23 42 / 0.18);
   pointer-events: none;
 }
+/* ---- Update notice ------------------------------------------------------------------------- */
+
+.gd-update-wrap { position: relative; flex: none; }
+.gd-update-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--gd-brand-soft);
+  color: var(--gd-brand-strong);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  animation: gd-pop 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.gd-update-btn:hover { background: rgb(91 91 246 / 0.2); }
+.gd-update-btn:focus-visible { outline: 2px solid var(--gd-brand); outline-offset: 2px; }
+.gd-update-btn svg { width: 14px; height: 14px; }
+.gd-update-pop { position: absolute; top: calc(100% + 10px); right: 0; left: auto; width: 300px; max-height: none; }
+.gd-update-steps { margin: 10px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.45; }
+.gd-update-steps li + li { margin-top: 8px; }
+.gd-update-link { color: var(--gd-brand-strong); font-weight: 650; }
+
 @media (prefers-reduced-motion: reduce) {
   .gd *,
   .gd *::before {

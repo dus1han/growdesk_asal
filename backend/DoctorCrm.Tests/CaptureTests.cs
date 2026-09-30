@@ -88,6 +88,33 @@ public class CaptureTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Connection_records_the_toolbar_version_it_connects_with()
+    {
+        var admin = await AdminAsync();
+        var created = await DataAsync<CaptureClientCreatedDto>(await admin.PostAsJsonAsync("/api/admin/capture-clients",
+            new CreateCaptureClientRequest($"Versioned PC {Interlocked.Increment(ref _seq)}")));
+
+        async Task TokenWith(string version)
+        {
+            var tool = factory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/capture/token")
+            {
+                Content = JsonContent.Create(new CaptureTokenRequest(created.Client.ClientId, created.ClientSecret)),
+            };
+            request.Headers.Add("X-GrowDesk-Capture-Version", version);
+            (await tool.SendAsync(request)).EnsureSuccessStatusCode();
+        }
+        CaptureClientDto Listed(List<CaptureClientDto> all) => all.Single(c => c.Id == created.Client.Id);
+
+        await TokenWith("1.0.7");
+        Assert.Equal("1.0.7", Listed(await DataAsync<List<CaptureClientDto>>(await admin.GetAsync("/api/admin/capture-clients"))).ExtensionVersion);
+
+        // Anything that isn't a version number is ignored; the last good one stays.
+        await TokenWith("<script>");
+        Assert.Equal("1.0.7", Listed(await DataAsync<List<CaptureClientDto>>(await admin.GetAsync("/api/admin/capture-clients"))).ExtensionVersion);
+    }
+
+    [Fact]
     public async Task Capture_tokens_and_user_sessions_do_not_cross_over()
     {
         var admin = await AdminAsync();

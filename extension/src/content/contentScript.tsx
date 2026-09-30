@@ -41,6 +41,7 @@ function App({ platform }: { platform: Platform }) {
   const [session, setSession] = useState<CaptureSession | null>(null);
   const [bundle, setBundle] = useState<ConfigBundle | null>(null);
   const [configured, setConfigured] = useState(true);
+  const [installType, setInstallType] = useState<string | undefined>();
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [errorField, setErrorField] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,6 +67,7 @@ function App({ platform }: { platform: Platform }) {
     setSession(r.session);
     if (r.bundle) setBundle(r.bundle);
     setConfigured(r.configured);
+    if (r.installType) setInstallType(r.installType);
   }, []);
 
   // Re-read the field setup: on load, when the tab comes back into view, and every minute while
@@ -218,6 +220,8 @@ function App({ platform }: { platform: Platform }) {
         onOpenSettings={() => void send({ type: 'GD_OPEN_SETTINGS' })}
         onOpenGuide={() => void send({ type: 'GD_OPEN_GUIDE' })}
         onDraw={(key) => setDrawing(key)}
+        installType={installType}
+        onReloadExtension={() => void send({ type: 'GD_RELOAD_EXTENSION' })}
       />
       {saved && (
         <div className="gd">

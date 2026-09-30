@@ -1,4 +1,4 @@
-import type { CaptureRequest, CaptureResult, ConfigBundle, ConfigField, Envelope, Lookup } from '../types/growdesk';
+import type { CaptureRequest, CaptureResult, ConfigBundle, ConfigField, Envelope, LatestRelease, Lookup } from '../types/growdesk';
 import { isConfigured, normalizeServer, originPattern, readSettings, type Settings } from '../storage/settings';
 
 /**
@@ -92,7 +92,8 @@ async function fetchToken(settings: Settings, server: string): Promise<CachedTok
   try {
     const data = await call<{ accessToken: string; expiresIn: number }>(server, '/capture/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // The version lets the admin see which PCs need updating (Connections list).
+      headers: { 'Content-Type': 'application/json', 'X-GrowDesk-Capture-Version': chrome.runtime.getManifest().version },
       body: JSON.stringify({ clientId: settings.clientId.trim(), clientSecret: settings.clientSecret.trim() }),
     });
     const token: CachedToken = {
@@ -169,12 +170,27 @@ export async function loadBundle(): Promise<ConfigBundle> {
     stages,
     sources,
     fetchedAt: new Date().toISOString(),
+    latest: await latestRelease(server),
   };
   // Only store a real change: the store triggers a context-menu rebuild in the service worker.
   const previous = await cachedBundle();
   const same = (x: ConfigBundle | null) => (x ? JSON.stringify({ ...x, fetchedAt: '' }) : '');
   if (same(previous) !== same(bundle)) await chrome.storage.local.set({ [BUNDLE_KEY]: bundle }).catch(() => undefined);
   return bundle;
+}
+
+/** The newest toolbar GrowDesk offers. Missing or unreadable just means no update notice. */
+async function latestRelease(server: string): Promise<LatestRelease | null> {
+  try {
+    const response = await fetch(`${server}/capture/latest.json`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!response.ok) return null;
+    const data = (await response.json()) as Partial<LatestRelease>;
+    return typeof data.version === 'string' && typeof data.download === 'string'
+      ? { version: data.version, download: data.download, guide: data.guide ?? `${server}/capture-guide` }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The last fetched setup, if any. Used to rebuild the context menu after the worker sleeps. */
