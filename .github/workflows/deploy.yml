@@ -113,18 +113,23 @@ jobs:
           done
 
           mkdir -p ~/.ssh
-          # printf keeps the trailing newline OpenSSH requires; tr drops Windows line endings that
-          # creep in when the key is pasted from a Windows editor.
-          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_deploy
+          # Rebuild the key from its base64 body, so the secret works however it was pasted: with
+          # or without the BEGIN/END lines, with Windows line endings, indentation or re-wrapping.
+          # (A paste that dropped the BEGIN line has already cost a failed deploy.)
+          {
+            echo '-----BEGIN OPENSSH PRIVATE KEY-----'
+            printf '%s\n' "$SSH_KEY" | grep -v -- '-----' | tr -d ' \t\r\n' | fold -w 70
+            echo   # tr removed every newline, including the one the last line needs
+            echo '-----END OPENSSH PRIVATE KEY-----'
+          } > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
 
           # Validate the key locally first. Otherwise a malformed paste surfaces as a bare
           # "error in libcrypto" followed by a password prompt, which names neither cause nor fix.
           if ! ssh-keygen -y -f ~/.ssh/id_deploy >/dev/null 2>&1; then
             echo "::error::VPS_SSH_KEY is not a valid private key."
-            echo "Paste the whole key, including the -----BEGIN OPENSSH PRIVATE KEY----- and"
-            echo "-----END OPENSSH PRIVATE KEY----- lines, with no leading spaces on any line."
-            echo "First line seen: $(head -c 36 ~/.ssh/id_deploy | tr -c '[:print:]' '?')"
+            echo "Paste the deploy user's private key (OpenSSH format). The BEGIN/END lines are optional."
+            echo "Key body received: $(grep -v -- '-----' ~/.ssh/id_deploy | tr -d '\n' | wc -c) base64 characters."
             exit 1
           fi
 
