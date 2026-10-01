@@ -57,6 +57,14 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     private static string Number() => $"+97150{Interlocked.Increment(ref _seq) + 1000000:0000000}";
 
+    /// <summary>Saves an interested customer, as the bot does on a new contact's first message; returns the number.</summary>
+    private static async Task<string> SavedAsync(HttpClient bot, string name, int[] treatments, string? number = null)
+    {
+        number ??= Number();
+        await DataAsync<BotLeadResultDto>(await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest(name, number, treatments, null)));
+        return number;
+    }
+
     private async Task<(HttpClient Admin, HttpClient Bot, int[] Treatments)> SetUpAsync()
     {
         var admin = await AdminAsync();
@@ -120,15 +128,14 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Booking_creates_the_customer_and_a_45_minute_consultation_and_moves_them_to_Booked()
+    public async Task Booking_a_saved_customer_gives_a_45_minute_consultation_and_moves_them_to_Booked()
     {
         var (admin, bot, t) = await SetUpAsync();
         var day = Day();
 
         var result = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings",
-            new BotBookingRequest("Maria Bot", Number(), [t[0], t[1]], day, "16:00", "First visit")));
+            new BotBookingRequest(await SavedAsync(bot, "Maria Bot", [t[0], t[1]]), [t[0], t[1]], day, "16:00", "First visit")));
         Assert.Equal("booked", result.Action);
-        Assert.Equal("created", result.CustomerAction);
         Assert.Equal(day, result.Booking.Date);
         Assert.Equal("16:00", result.Booking.StartTime);
         Assert.Equal("16:45", result.Booking.EndTime);
@@ -142,6 +149,15 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Only_a_saved_customer_can_be_booked()
+    {
+        var (_, bot, t) = await SetUpAsync();
+        var unknown = await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(Number(), [t[0]], Day(), "10:00", null));
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal("whatsapp", (await BodyAsync(unknown)).Errors.Single().Field);
+    }
+
+    [Fact]
     public async Task An_interested_lead_who_books_later_is_the_same_customer()
     {
         var (_, bot, t) = await SetUpAsync();
@@ -149,8 +165,7 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var lead = await DataAsync<BotLeadResultDto>(await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("Lena Bot", number, [t[0]], null)));
 
         var result = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings",
-            new BotBookingRequest("Lena Bot", number, [t[0]], Day(), "10:00", null)));
-        Assert.Equal("updated", result.CustomerAction);
+            new BotBookingRequest(number, [t[0]], Day(), "10:00", null)));
         Assert.Equal(lead.CustomerId, result.Booking.CustomerId);
 
         var upcoming = await DataAsync<List<BotBookingDto>>(await bot.GetAsync($"/api/bot/bookings?whatsapp={Uri.EscapeDataString(number)}"));
@@ -162,10 +177,10 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         var (_, bot, t) = await SetUpAsync();
         var day = Day();
-        await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest("First", Number(), [t[0]], day, "11:00", null)));
+        await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(await SavedAsync(bot, "First", [t[0]]), [t[0]], day, "11:00", null)));
 
         // 11:30 overlaps 11:00–11:45.
-        var clash = await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest("Second", Number(), [t[0]], day, "11:30", null));
+        var clash = await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(await SavedAsync(bot, "Second", [t[0]]), [t[0]], day, "11:30", null));
         Assert.Equal(HttpStatusCode.Conflict, clash.StatusCode);
         var free = (await BodyAsync(clash)).Data.GetProperty("freeTimes").EnumerateArray().Select(e => e.GetString()).ToList();
         Assert.Contains("11:45", free);
@@ -187,10 +202,10 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         var (admin, bot, t) = await SetUpAsync();
         var day = Day();
-        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest("A", Number(), [t[0]], day, "07:30", null))).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest("A", Number(), [t[0]], day, "19:30", null))).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest("A", Number(), [t[0]], "2020-01-01", "10:00", null))).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest("A", Number(), [t[0]], "05/10/2026", "10:00", null))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(await SavedAsync(bot, "A", [t[0]]), [t[0]], day, "07:30", null))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(await SavedAsync(bot, "A", [t[0]]), [t[0]], day, "19:30", null))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(await SavedAsync(bot, "A", [t[0]]), [t[0]], "2020-01-01", "10:00", null))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(await SavedAsync(bot, "A", [t[0]]), [t[0]], "05/10/2026", "10:00", null))).StatusCode);
 
         // A closed day: no free times, and no bookings.
         var date = DateOnly.Parse(day);
@@ -201,7 +216,7 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var availability = await DataAsync<BotAvailabilityDto>(await bot.GetAsync($"/api/bot/availability?date={day}"));
         Assert.False(availability.Open);
         Assert.Empty(availability.FreeTimes);
-        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest("A", Number(), [t[0]], day, "10:00", null))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(await SavedAsync(bot, "A", [t[0]]), [t[0]], day, "10:00", null))).StatusCode);
     }
 
     [Fact]
@@ -222,7 +237,7 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         await OpenAllWeekAsync(admin, 60);
         var bot = await ConnectAsync(admin);
         var t = (await DataAsync<List<BotTreatmentDto>>(await bot.GetAsync("/api/bot/treatments")))[0].Id;
-        var result = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest("Hour", Number(), [t], Day(), "09:00", null)));
+        var result = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(await SavedAsync(bot, "Hour", [t]), [t], Day(), "09:00", null)));
         Assert.Equal("10:00", result.Booking.EndTime);
         await OpenAllWeekAsync(admin);
     }
@@ -233,8 +248,9 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var (admin, bot, t) = await SetUpAsync();
         var number = Number();
         var day = Day();
+        await SavedAsync(bot, "Mover", [t[0]], number);
         var booked = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings",
-            new BotBookingRequest("Mover", number, [t[0]], day, "09:00", "Original note")));
+            new BotBookingRequest(number, [t[0]], day, "09:00", "Original note")));
         var id = booked.Booking.BookingId;
 
         // Someone else's number can't touch it.
@@ -285,7 +301,7 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         for (var i = 0; i < 50 && live.SubscriberCount == 0; i++) await Task.Delay(50);
 
         var result = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings",
-            new BotBookingRequest("Live Bot", Number(), [t[0]], Day(), "12:00", null)));
+            new BotBookingRequest(await SavedAsync(bot, "Live Bot", [t[0]]), [t[0]], Day(), "12:00", null)));
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var lines = new List<string>();
@@ -309,9 +325,9 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         var (admin, bot, t) = await SetUpAsync();
         var first = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings",
-            new BotBookingRequest("Seen", Number(), [t[0]], Day(), "13:00", null)));
+            new BotBookingRequest(await SavedAsync(bot, "Seen", [t[0]]), [t[0]], Day(), "13:00", null)));
         var missed = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings",
-            new BotBookingRequest("Missed", Number(), [t[0]], Day(), "13:00", null)));
+            new BotBookingRequest(await SavedAsync(bot, "Missed", [t[0]]), [t[0]], Day(), "13:00", null)));
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/live/stream");
         request.Headers.Add("Last-Event-ID", first.Booking.BookingId.ToString());
@@ -335,7 +351,7 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var lead = await DataAsync<BotLeadResultDto>(await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("Blocked", Number(), [t[0]], null)));
 
         // A consultation already booked in the time to block is reported, and stays booked.
-        await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest("Early", Number(), [t[0]], day, "14:15", null)));
+        await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(await SavedAsync(bot, "Early", [t[0]]), [t[0]], day, "14:15", null)));
         var created = await DataAsync<CalendarBlockCreatedDto>(await admin.PostAsJsonAsync("/api/calendar/blocks",
             new CreateCalendarBlockRequest(date, null, new TimeOnly(14, 0), new TimeOnly(16, 0), "Doctor away")));
         Assert.Equal(1, created.BookedConsultations);
@@ -346,7 +362,7 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.DoesNotContain("15:00", availability.FreeTimes);
         Assert.Contains("16:00", availability.FreeTimes);
 
-        var botClash = await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest("Late", Number(), [t[0]], day, "15:00", null));
+        var botClash = await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(await SavedAsync(bot, "Late", [t[0]]), [t[0]], day, "15:00", null));
         Assert.Equal(HttpStatusCode.Conflict, botClash.StatusCode);
         Assert.Contains("16:00", (await BodyAsync(botClash)).Data.GetProperty("freeTimes").EnumerateArray().Select(e => e.GetString()));
 
@@ -375,7 +391,7 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var availability = await DataAsync<BotAvailabilityDto>(await bot.GetAsync($"/api/bot/availability?date={middle}"));
         Assert.Empty(availability.FreeTimes);
         Assert.Equal(HttpStatusCode.Conflict, (await bot.PostAsJsonAsync("/api/bot/bookings",
-            new BotBookingRequest("Holiday", Number(), [t[0]], middle, "10:00", null))).StatusCode);
+            new BotBookingRequest(await SavedAsync(bot, "Holiday", [t[0]]), [t[0]], middle, "10:00", null))).StatusCode);
         var after = start.AddDays(3).ToString("yyyy-MM-dd");
         Assert.NotEmpty((await DataAsync<BotAvailabilityDto>(await bot.GetAsync($"/api/bot/availability?date={after}"))).FreeTimes);
     }

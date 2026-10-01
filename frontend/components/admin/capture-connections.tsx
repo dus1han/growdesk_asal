@@ -49,7 +49,7 @@ const COPY: Record<
   Bot: {
     description: "The WhatsApp BOT signs in with its own connection. Revoke it to stop the bot straight away.",
     emptyTitle: "No bot connection yet",
-    emptyDescription: "Add a connection and give its details to the bot's developer, with the API guide.",
+    emptyDescription: "Add a connection and give its details to the bot's developer.",
     addDescription: "Usually one connection for your WhatsApp BOT.",
     readyDescription: (name) => `Give these to the developer of ${name}. The bot uses them to sign in.`,
     placeholder: "WhatsApp BOT",

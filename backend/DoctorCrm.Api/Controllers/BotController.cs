@@ -56,7 +56,7 @@ public class BotController(CaptureClientService clients, BotService bot) : Contr
     public async Task<ActionResult<ApiResponse<IReadOnlyList<BotBookingDto>>>> Bookings([FromQuery] string? whatsapp, CancellationToken ct) =>
         Ok(ApiResponse<IReadOnlyList<BotBookingDto>>.Ok(await bot.UpcomingAsync(whatsapp, ct)));
 
-    /// <summary>Books a consultation, creating the customer if the WhatsApp number is new.</summary>
+    /// <summary>Books a consultation for a customer saved earlier with POST /customers.</summary>
     [HttpPost("bookings")]
     public async Task<ActionResult<ApiResponse<BotBookingResultDto>>> Book(BotBookingRequest request, CancellationToken ct)
     {

@@ -7,8 +7,9 @@ using Microsoft.EntityFrameworkCore;
 namespace DoctorCrm.Api.Services;
 
 /// <summary>
-/// The WhatsApp BOT API. The bot owns no business rules: GrowDesk finds the customer by WhatsApp
-/// number, works out the end time, keeps bookings inside opening hours and free of clashes, and
+/// The WhatsApp BOT API. The bot owns no business rules: the bot saves each new contact as an
+/// interested customer, then books for them; GrowDesk finds the customer by WhatsApp number,
+/// works out the end time, keeps bookings inside opening hours and free of clashes, and
 /// moves stages. Bookings go on the shared calendar (no doctor) and are marked "WhatsApp BOT".
 /// </summary>
 public class BotService(
@@ -79,23 +80,30 @@ public class BotService(
 
     // ---- Bookings ------------------------------------------------------------------------------------
 
+    /// <summary>
+    /// Books a consultation for a customer the bot already saved (POST /customers on their first
+    /// message). An unknown number answers 404, so the bot saves the customer first.
+    /// </summary>
     public async Task<BotBookingResultDto> BookAsync(BotBookingRequest r, string client, CancellationToken ct)
     {
-        var name = Name(r.Name);
         var number = Phone(r.WhatsApp);
         var treatmentIds = await TreatmentIdsAsync(r.TreatmentIds, ct);
         var notes = Notes(r.Notes);
         var (day, start, end) = await SlotAsync(r.Date, r.StartTime, ct);
 
+        var customer = await db.Customers.Include(c => c.Treatments).SingleOrDefaultAsync(c => c.WhatsAppNumber == number, ct)
+            ?? throw new BusinessRuleException(
+                "No customer has this WhatsApp number yet. Save them with POST /api/bot/customers first.",
+                StatusCodes.Status404NotFound, "whatsapp");
+
         BookingDetailDto created;
-        string customerAction;
         await using (var tx = await db.Database.BeginTransactionAsync(ct))
         {
             await LockDayAsync(day, ct);
             await EnsureFreeAsync(day, start, end, excludeId: null, ct);
 
-            Customer customer;
-            (customer, customerAction) = await UpsertCustomerAsync(name, number, treatmentIds, null, client, ct);
+            // The booked treatments join the customer's interests.
+            await UpdateKnownAsync(customer, treatmentIds, null, client, ct);
             await SaveAsync(ct);
 
             created = await bookings.CreateAsync(
@@ -104,7 +112,7 @@ public class BotService(
         }
 
         await PublishAsync(created.Id, null, ct);
-        return new BotBookingResultDto("booked", await ToBotAsync(created.Id, ct), customerAction, null);
+        return new BotBookingResultDto("booked", await ToBotAsync(created.Id, ct), null);
     }
 
     public async Task<BotBookingResultDto> UpdateAsync(int bookingId, BotBookingUpdateRequest r, string client, CancellationToken ct)
@@ -153,7 +161,7 @@ public class BotService(
         }
 
         await PublishAsync(resultId, moving ? null : "booking.updated", ct);
-        return new BotBookingResultDto(moving ? "rescheduled" : "updated", await ToBotAsync(resultId, ct), null, moving ? bookingId : null);
+        return new BotBookingResultDto(moving ? "rescheduled" : "updated", await ToBotAsync(resultId, ct), moving ? bookingId : null);
     }
 
     // ---- Live updates ----------------------------------------------------------------------------------
@@ -195,18 +203,16 @@ public class BotService(
     private async Task<(Customer Customer, string Action)> UpsertCustomerAsync(
         string name, string number, IReadOnlyList<int> treatmentIds, string? notes, string client, CancellationToken ct)
     {
-        var today = await clock.TodayAsync(ct);
-        var sourceId = await SourceIdAsync(ct);
         var customer = await db.Customers.Include(c => c.Treatments).SingleOrDefaultAsync(c => c.WhatsAppNumber == number, ct);
-
         if (customer is null)
         {
+            var today = await clock.TodayAsync(ct);
             customer = new Customer
             {
                 Name = name,
                 WhatsAppNumber = number,
                 StageId = await db.Stages.Where(s => s.SystemKey == StageKeys.Interested).Select(s => s.Id).SingleAsync(ct),
-                LeadSourceId = sourceId,
+                LeadSourceId = await SourceIdAsync(ct),
                 Notes = notes,
                 LastContactDate = today,
             };
@@ -218,6 +224,17 @@ public class BotService(
             return (customer, "created");
         }
 
+        await UpdateKnownAsync(customer, treatmentIds, notes, client, ct);
+        return (customer, "updated");
+    }
+
+    /// <summary>
+    /// A known customer heard from again: reactivated if archived, the bot's source if none was
+    /// recorded, new treatments added and notes appended. Name and stage stay as they are.
+    /// </summary>
+    private async Task UpdateKnownAsync(Customer customer, IReadOnlyList<int> treatmentIds, string? notes, string client, CancellationToken ct)
+    {
+        var today = await clock.TodayAsync(ct);
         var changed = new List<string>();
         if (!customer.IsActive)
         {
@@ -226,7 +243,7 @@ public class BotService(
         }
         if (customer.LeadSourceId is null)
         {
-            customer.LeadSourceId = sourceId;
+            customer.LeadSourceId = await SourceIdAsync(ct);
             changed.Add(nameof(Customer.LeadSourceId));
         }
         if (notes is not null && customer.Notes?.Contains(notes, StringComparison.Ordinal) != true)
@@ -248,7 +265,6 @@ public class BotService(
         customer.LastContactDate = today;
         if (changed.Count > 0)
             audit.Record(null, "Customer Updated", nameof(Customer), customer.Id, new { fields = changed, source = SourceName, client });
-        return (customer, "updated");
     }
 
     /// <summary>The "WhatsApp BOT" lead source; added if an admin removed or renamed it.</summary>

@@ -23,8 +23,8 @@ public record BotLeadRequest(string? Name, string? WhatsApp, IReadOnlyList<int>?
 /// <summary><c>Action</c> is "created" or "updated" (the WhatsApp number was already known).</summary>
 public record BotLeadResultDto(int CustomerId, string Action, string CustomerName, string Stage);
 
-/// <summary>Books a consultation, creating the customer first if the WhatsApp number is new.</summary>
-public record BotBookingRequest(string? Name, string? WhatsApp, IReadOnlyList<int>? TreatmentIds, string? Date, string? StartTime, string? Notes);
+/// <summary>Books a consultation for a customer already saved with POST /customers (found by WhatsApp number).</summary>
+public record BotBookingRequest(string? WhatsApp, IReadOnlyList<int>? TreatmentIds, string? Date, string? StartTime, string? Notes);
 
 /// <summary>
 /// Changes a booked consultation. <c>WhatsApp</c> must be the booking customer's number. Send
@@ -49,9 +49,9 @@ public record BotBookingDto(
 /// <summary>
 /// <c>Action</c>: "booked", "updated" or "rescheduled". A reschedule creates a new booking (the
 /// old one is kept as Rescheduled), so <c>Booking.BookingId</c> is then the new ID and
-/// <c>PreviousBookingId</c> the old one. <c>CustomerAction</c> is set when booking: "created" or "updated".
+/// <c>PreviousBookingId</c> the old one.
 /// </summary>
-public record BotBookingResultDto(string Action, BotBookingDto Booking, string? CustomerAction, int? PreviousBookingId);
+public record BotBookingResultDto(string Action, BotBookingDto Booking, int? PreviousBookingId);
 
 /// <summary>Returned with a 409 when the requested time is taken: other free times that day.</summary>
 public record BotSlotTakenDto(string Date, string RequestedTime, IReadOnlyList<string> FreeTimes);

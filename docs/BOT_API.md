@@ -1,35 +1,35 @@
-# GrowDesk WhatsApp BOT API
+# WhatsApp BOT API
 
-This guide is for the developer connecting a WhatsApp chatbot to GrowDesk. With this API the bot can:
+This guide is for the developer connecting a WhatsApp chatbot to the clinic's CRM through the WhatsApp BOT API. The bot can:
 
+- save every new contact as an interested customer;
 - list the treatments a customer can choose;
 - find free consultation times on a day;
-- save an interested customer;
-- book a consultation (and create the customer at the same time);
+- book a consultation;
 - look up, move or change a customer's booking.
 
-GrowDesk applies all the clinic's rules. The bot only sends what the customer chose, and GrowDesk:
+The bot only sends what the customer said or chose. The WhatsApp BOT API applies all the clinic's rules:
 
-- finds or creates the customer by WhatsApp number;
-- works out the end time;
-- keeps bookings inside opening hours and away from other bookings and blocked time;
-- moves the customer's stage.
+- it finds the customer by WhatsApp number, so there are no duplicates;
+- it works out each booking's end time;
+- it keeps bookings inside opening hours and away from other bookings and blocked time;
+- it moves the customer's stage.
 
-Each booking appears on the clinic's GrowDesk screens the moment it is made.
+Each new booking appears on the clinic's screens the moment it is made.
 
 ## 1. Before you start
 
-The clinic's GrowDesk admin gives you three things. They come from **Administration → WhatsApp BOT → Connections → Add connection**:
+The clinic's admin gives you three values. They come from **Administration → WhatsApp BOT → Connections → Add connection** in the CRM:
 
-| Item | Example |
+| Value | Example |
 |---|---|
 | API address | `http://169.58.92.105:3110/api/bot` |
 | Client ID | `gdc_8f3c…` |
 | Client secret | `gds_41ab…` (shown to the admin only once) |
 
-Keep the client secret on your server. Never put it in a WhatsApp message, a web page or a mobile app. If it leaks, the admin revokes the connection and gives you a new one.
+Keep the client secret on your server. Never put it in a WhatsApp message, a web page or a mobile app. If it leaks, the admin revokes the connection and issues a new one.
 
-> **HTTPS:** the address above is plain HTTP for now, so the secret and customer details travel unencrypted. When GrowDesk moves to a domain with HTTPS, only the address changes, to `https://<domain>/api/bot`. Nothing else in this guide changes.
+> **HTTPS:** the address above is plain HTTP for now, so the secret and customer details travel unencrypted. When the CRM moves to a domain with HTTPS, only the address changes, to `https://<domain>/api/bot`. Nothing else in this guide changes.
 
 ## 2. Conventions
 
@@ -37,7 +37,7 @@ Keep the client secret on your server. Never put it in a WhatsApp message, a web
 - **Dates:** `yyyy-MM-dd`, e.g. `2026-10-05`.
 - **Times:** 24-hour `HH:mm`, e.g. `16:00`.
 - **Time zone:** dates and times are always the clinic's local time (Asia/Dubai).
-- **WhatsApp numbers:** send them with the country code, e.g. `+971501234567`. Spaces, dashes and a leading `00` are fine. GrowDesk normalises the number, so `+971 50 123 4567` and `00971501234567` are the same customer.
+- **WhatsApp numbers:** send them with the country code, e.g. `+971501234567`. Spaces, dashes and a leading `00` are fine. The API normalises the number, so `+971 50 123 4567` and `00971501234567` are the same customer.
 - **IDs:** whole numbers.
 
 Every response has the same envelope:
@@ -65,14 +65,14 @@ The `message` is written for people, so the bot can pass it on or reword it. `er
 | 400 | Something sent is missing or invalid (bad date, closed day, past time, unknown treatment…) | Read `message` and ask the customer again |
 | 401 | No token, or it expired or was revoked | Get a new token (section 3) and retry once |
 | 403 | This connection isn't a bot connection | Ask the admin for a **WhatsApp BOT** connection |
-| 404 | Booking not found for this WhatsApp number | Check the booking ID and number |
-| 409 | The time is taken or blocked, or the booking can no longer be changed | Offer the free times in `data.freeTimes` (section 6) |
+| 404 | Customer not saved yet (booking), or booking not found for this WhatsApp number | Save the customer first (section 4), or check the booking ID and number |
+| 409 | The time is taken or blocked, or the booking can no longer be changed | Offer the free times in `data.freeTimes` (section 7) |
 | 429 | Too many requests | Wait a minute and retry |
-| 500 | Something went wrong in GrowDesk | Retry later; tell the customer the clinic will confirm |
+| 500 | Something went wrong on the server | Retry later; tell the customer the clinic will confirm |
 
 ## 3. Signing in: `POST /token`
 
-Exchange the client ID and secret for an access token, then send that token with every other call.
+Exchange the client ID and secret for an access token:
 
 ```http
 POST /api/bot/token
@@ -94,13 +94,53 @@ Send the token in the `Authorization` header on every other call:
 Authorization: Bearer eyJhbGciOi…
 ```
 
-The token lasts **15 minutes** (`expiresIn` is in seconds). Keep one token and reuse it. Get a new one shortly before it expires, or when a call answers **401**. Don't request a token for every message: token requests are limited to 10 per minute.
+- **Lifetime:** 15 minutes (`expiresIn` is in seconds).
+- **Reuse:** keep one token and reuse it. Get a new one shortly before it expires, or when a call answers **401**.
+- **Limit:** don't request a token for every message; token requests are limited to 10 per minute.
+- **Refused:** a wrong ID or secret, or a revoked connection, answers **401**.
 
-A wrong ID or secret, or a revoked connection, answers **401**.
+## 4. Save the customer: `POST /customers`
 
-## 4. Treatments: `GET /treatments`
+Call this when a **new message arrives**, so every contact is saved as an interested customer straight away. This is the only call that creates customers. A booking (section 7) needs the customer saved first.
 
-Lists the treatments the customer can choose, in the clinic's order. Use the `id` values in the other calls. The list can change when the clinic edits it, so fetch it at least daily rather than hard-coding it.
+Calling it again for a known number is safe. It never creates a duplicate, so the bot can call it on every new conversation, or again when the customer mentions more treatments.
+
+```http
+POST /api/bot/customers
+Authorization: Bearer …
+Content-Type: application/json
+
+{
+  "name": "Sarah Fernando",
+  "whatsapp": "+971501234567",
+  "treatmentIds": [1],
+  "notes": "Asked about pricing"
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `name` | Yes | Up to 150 characters, e.g. the WhatsApp profile name. Used only when the customer is new. |
+| `whatsapp` | Yes | With country code. |
+| `treatmentIds` | Yes | At least one ID from `GET /treatments`. Added to the customer's interests, never removed. |
+| `notes` | No | Added to the customer's notes. Up to 2000 characters. |
+
+```json
+{
+  "success": true,
+  "data": { "customerId": 1052, "action": "created", "customerName": "Sarah Fernando", "stage": "Interested" },
+  "message": "Sarah Fernando was added."
+}
+```
+
+What the API does:
+
+- **New number:** creates the customer at stage **Interested**, with lead source **WhatsApp BOT**.
+- **Known number:** returns `action: "updated"` with the same `customerId`. The customer's name, stage and source don't change.
+
+## 5. Treatments: `GET /treatments`
+
+Lists the treatments a customer can choose, in the clinic's order. Use the `id` values in the other calls. The clinic edits this list, so fetch it at least daily instead of hard-coding it.
 
 ```http
 GET /api/bot/treatments
@@ -118,7 +158,7 @@ Authorization: Bearer …
 }
 ```
 
-## 5. Free times: `GET /availability?date=yyyy-MM-dd`
+## 6. Free times: `GET /availability?date=yyyy-MM-dd`
 
 Returns the start times still free on a day for one consultation. The times:
 
@@ -157,9 +197,9 @@ Rules on the date:
 - It can be today, up to **180 days** ahead.
 - A past date answers **400**.
 
-## 6. Book a consultation: `POST /bookings`
+## 7. Book a consultation: `POST /bookings`
 
-One call does everything: it creates the customer if the number is new, books the consultation and moves the customer's stage to **Booked**. The customer and the booking are saved together. If the booking can't be made, nothing is saved.
+Books a consultation for a customer saved in section 4, found by WhatsApp number. The customer's stage moves to **Booked**.
 
 ```http
 POST /api/bot/bookings
@@ -167,7 +207,6 @@ Authorization: Bearer …
 Content-Type: application/json
 
 {
-  "name": "Sarah Fernando",
   "whatsapp": "+971501234567",
   "treatmentIds": [1, 2],
   "date": "2026-10-05",
@@ -178,9 +217,8 @@ Content-Type: application/json
 
 | Field | Required | Notes |
 |---|---|---|
-| `name` | Yes | Up to 150 characters. Used only when the customer is new; an existing customer keeps the name on record. |
-| `whatsapp` | Yes | The customer's WhatsApp number, with country code. |
-| `treatmentIds` | Yes | At least one ID from `GET /treatments`. |
+| `whatsapp` | Yes | The customer's WhatsApp number, as saved with `POST /customers`. |
+| `treatmentIds` | Yes | At least one ID from `GET /treatments`. They are also added to the customer's interests. |
 | `date` | Yes | `yyyy-MM-dd`. |
 | `startTime` | Yes | `HH:mm`. The end time is the start plus the clinic's booking length (45 minutes by default). |
 | `notes` | No | Saved on the booking. Up to 2000 characters. |
@@ -190,7 +228,6 @@ Content-Type: application/json
   "success": true,
   "data": {
     "action": "booked",
-    "customerAction": "created",
     "previousBookingId": null,
     "booking": {
       "bookingId": 873,
@@ -208,12 +245,22 @@ Content-Type: application/json
 }
 ```
 
-Response fields:
+Store `booking.bookingId` if you want to change the booking later.
 
-- `customerAction`: `created` for a new number, `updated` for a customer GrowDesk already knew.
-- `booking.bookingId`: store it if you want to change the booking later.
+**Customer not saved yet (404):**
 
-**When the time is taken or blocked (409):** GrowDesk returns the other free times that day, so the bot can offer them straight away:
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "No customer has this WhatsApp number yet. Save them with POST /api/bot/customers first.",
+  "errors": [{ "field": "whatsapp", "message": "No customer has this WhatsApp number yet. Save them with POST /api/bot/customers first." }]
+}
+```
+
+Call `POST /customers`, then book again.
+
+**When the time is taken or blocked (409):** the reply lists the other free times that day, so the bot can offer them straight away:
 
 ```json
 {
@@ -234,44 +281,6 @@ Response fields:
 - the WhatsApp number is invalid.
 
 The `message` says which it was.
-
-## 7. Save an interested customer: `POST /customers`
-
-Use this when the chat ends without a booking, so the clinic can follow up.
-
-```http
-POST /api/bot/customers
-Authorization: Bearer …
-Content-Type: application/json
-
-{
-  "name": "Sarah Fernando",
-  "whatsapp": "+971501234567",
-  "treatmentIds": [1],
-  "notes": "Wants to book after payday"
-}
-```
-
-| Field | Required | Notes |
-|---|---|---|
-| `name` | Yes | Used only when the customer is new. |
-| `whatsapp` | Yes | With country code. |
-| `treatmentIds` | Yes | At least one. Added to the customer's interests, never removed. |
-| `notes` | No | Added to the customer's notes. |
-
-```json
-{
-  "success": true,
-  "data": { "customerId": 1052, "action": "created", "customerName": "Sarah Fernando", "stage": "Interested" },
-  "message": "Sarah Fernando was added."
-}
-```
-
-What GrowDesk does:
-
-- **New number:** creates the customer at stage **Interested**, with lead source **WhatsApp BOT**.
-- **Known number:** returns `action: "updated"` with the same `customerId`, so there is never a duplicate. The customer's name, stage and source don't change.
-- **Booking later:** if the customer books afterwards with the same number, `POST /bookings` finds them and moves them to **Booked**.
 
 ## 8. The customer's bookings: `GET /bookings?whatsapp=…`
 
@@ -307,9 +316,9 @@ Authorization: Bearer …
 
 Send the customer's `whatsapp` number, which must be the booking customer's number, plus only what changes:
 
-- **Move it:** send `date` **and** `startTime` together. The end time is worked out again. The same rules as booking apply: opening hours, clashes, blocked time, not in the past.
+- **Move it:** send `date` **and** `startTime` together. The end time is worked out again. The booking rules apply: opening hours, clashes, blocked time, not in the past.
 - **Change treatments:** send `treatmentIds`. They replace the booking's treatments.
-- **Change the note:** send `notes`. They replace the booking's note; send `""` to clear it.
+- **Change the note:** send `notes`. It replaces the booking's note; send `""` to clear it.
 
 You can do all three in one call.
 
@@ -327,7 +336,6 @@ Content-Type: application/json
   "data": {
     "action": "rescheduled",
     "previousBookingId": 873,
-    "customerAction": null,
     "booking": {
       "bookingId": 874,
       "customerId": 1052,
@@ -354,21 +362,22 @@ Changing only treatments or notes keeps the same ID, with `action: "updated"`.
 | 409 | The new time is taken or blocked (with `freeTimes`), or the booking is no longer *Booked* (completed, cancelled, already moved) |
 | 400 | Only one of `date`/`startTime` was sent, nothing to change was sent, or a value is invalid |
 
-Cancelling is not available to the bot. The clinic cancels bookings in GrowDesk.
+Cancelling is not available to the bot. The clinic cancels bookings in the CRM.
 
 ## 10. A typical conversation
 
-1. The customer asks for a treatment. Match it to `GET /treatments`.
-2. The customer suggests a day. Call `GET /availability?date=…` and offer a few `freeTimes`.
-3. The customer picks a time. Call `POST /bookings`.
-   - **200:** confirm `date`, `startTime`–`endTime` and the treatments.
-   - **409:** someone took the time in the meantime. Offer `data.freeTimes`.
-   - **400:** reword `message` and ask again.
-4. If the customer leaves without booking, call `POST /customers` so the clinic can follow up.
-5. Later, if the customer wants to change the appointment:
-   - call `GET /bookings?whatsapp=…` to find it;
-   - call `PATCH /bookings/{bookingId}` to change it;
-   - keep the new `bookingId` from the reply.
+1. **A new message arrives.** Call `POST /customers` with the contact's name and number, and the treatment they ask about once you know it. They are now an interested customer.
+2. **The customer asks for a treatment.** Match it to `GET /treatments`. If it's a new interest, call `POST /customers` again to add it.
+3. **The customer suggests a day.** Call `GET /availability?date=…` and offer a few `freeTimes`.
+4. **The customer picks a time.** Call `POST /bookings`:
+    - **200:** confirm the date, start–end time and treatments.
+    - **409:** someone took the time in the meantime. Offer `data.freeTimes`.
+    - **404:** the customer wasn't saved yet. Do step 1, then book again.
+    - **400:** reword `message` and ask again.
+5. **The customer wants to change the appointment later.**
+    - Call `GET /bookings?whatsapp=…` to find it.
+    - Call `PATCH /bookings/{bookingId}` to change it.
+    - Keep the new `bookingId` from the reply.
 
 ## 11. Limits
 
@@ -385,10 +394,14 @@ TOKEN=$(curl -s -X POST $API/token -H "Content-Type: application/json" \
   -d '{"clientId":"gdc_…","clientSecret":"gds_…"}' | jq -r .data.accessToken)
 
 curl -s $API/treatments -H "Authorization: Bearer $TOKEN"
+
+curl -s -X POST $API/customers -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"Test Customer","whatsapp":"+971500000000","treatmentIds":[1]}'
+
 curl -s "$API/availability?date=2026-10-05" -H "Authorization: Bearer $TOKEN"
 
 curl -s -X POST $API/bookings -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"name":"Test Customer","whatsapp":"+971500000000","treatmentIds":[1],"date":"2026-10-05","startTime":"16:00"}'
+  -d '{"whatsapp":"+971500000000","treatmentIds":[1],"date":"2026-10-05","startTime":"16:00"}'
 ```
 
-These calls create real customers and bookings in GrowDesk. Ask the clinic to cancel any test bookings.
+These calls create real customers and bookings in the clinic's CRM. Ask the clinic to cancel any test bookings.

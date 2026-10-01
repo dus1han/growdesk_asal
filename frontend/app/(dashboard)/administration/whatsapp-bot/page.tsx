@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, CircleAlert, ExternalLink, RotateCcw } from "lucide-react";
+import { CircleAlert, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CaptureConnections } from "@/components/admin/capture-connections";
@@ -13,11 +13,7 @@ import { Input, Select, Switch } from "@/components/ui/form-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toastError, useBookingHours, useSaveBookingHours } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
-import { cn } from "@/lib/utils";
 import type { BookingHours, OpeningDay } from "@/types/admin";
-
-/** The developer guide for the bot API, kept with the code so it always matches it. */
-const GUIDE_URL = "https://github.com/dus1han/growdesk_asal/blob/main/docs/BOT_API.md";
 
 const LENGTHS = [15, 20, 30, 45, 60, 75, 90, 120];
 
@@ -30,7 +26,6 @@ export default function WhatsAppBotPage() {
       />
       <OpeningHoursCard />
       <CaptureConnections kind="Bot" />
-      <ApiCard />
     </>
   );
 }
@@ -174,58 +169,6 @@ function OpeningHoursCard() {
           </AnimatePresence>
         </div>
       )}
-    </Card>
-  );
-}
-
-// ---- API summary -----------------------------------------------------------------------------------
-
-const ENDPOINTS: { method: string; path: string; what: string }[] = [
-  { method: "POST", path: "/token", what: "Sign in with the client ID and secret; the token lasts 15 minutes" },
-  { method: "GET", path: "/treatments", what: "Treatments the bot can offer" },
-  { method: "GET", path: "/availability?date=…", what: "Free start times on a day" },
-  { method: "POST", path: "/customers", what: "Save an interested customer (no booking)" },
-  { method: "POST", path: "/bookings", what: "Book a consultation, creating the customer if new" },
-  { method: "GET", path: "/bookings?whatsapp=…", what: "The customer's upcoming bookings" },
-  { method: "PATCH", path: "/bookings/{id}", what: "Move a booking, or change its treatments or notes" },
-];
-
-function ApiCard() {
-  const [origin, setOrigin] = useState("");
-  useEffect(() => setOrigin(window.location.origin), []); // eslint-disable-line react-hooks/set-state-in-effect -- read once after mount
-
-  return (
-    <Card className="mt-6 overflow-hidden">
-      <CardHeader
-        title="API for the bot's developer"
-        description={`Every call goes to ${origin || "this GrowDesk"}/api/bot. Give the developer the guide and a connection from above.`}
-        action={
-          <a
-            href={GUIDE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-surface-muted"
-          >
-            <BookOpen className="size-4" /> API guide <ExternalLink className="size-3.5 text-muted" />
-          </a>
-        }
-      />
-      <ul className="divide-y divide-line">
-        {ENDPOINTS.map((e) => (
-          <li key={e.method + e.path} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-2.5 text-sm">
-            <span
-              className={cn(
-                "w-14 shrink-0 rounded-md px-1.5 py-0.5 text-center font-mono text-[11px] font-semibold",
-                e.method === "GET" ? "bg-emerald-50 text-emerald-700" : e.method === "PATCH" ? "bg-amber-50 text-amber-700" : "bg-brand-soft text-brand-strong",
-              )}
-            >
-              {e.method}
-            </span>
-            <code className="font-mono text-[13px]">/api/bot{e.path}</code>
-            <span className="basis-full text-xs text-muted sm:basis-auto sm:before:mr-2 sm:before:content-['·']">{e.what}</span>
-          </li>
-        ))}
-      </ul>
     </Card>
   );
 }
