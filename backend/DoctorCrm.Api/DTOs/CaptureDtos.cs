@@ -14,9 +14,12 @@ public record CaptureClientDto(
     DateTime? LastUsedAt,
     DateTime? RevokedAt,
     /// <summary>The toolbar version this PC last connected with.</summary>
-    string? ExtensionVersion);
+    string? ExtensionVersion,
+    /// <summary>"Toolbar" or "Bot".</summary>
+    string Kind);
 
-public record CreateCaptureClientRequest(string Name);
+/// <summary><c>Kind</c> is "Toolbar" (default) or "Bot".</summary>
+public record CreateCaptureClientRequest(string Name, string? Kind = null);
 
 /// <summary>Returned once, when a connection is created. The secret cannot be read again.</summary>
 public record CaptureClientCreatedDto(CaptureClientDto Client, string ClientSecret);

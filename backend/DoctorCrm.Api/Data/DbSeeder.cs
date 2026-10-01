@@ -18,6 +18,7 @@ public class DbSeeder(AppDbContext db, IConfiguration config, ILogger<DbSeeder> 
         await SeedStagesAsync(ct);
         await SeedTreatmentsAsync(ct);
         await SeedListAsync(db.LeadSources, ["Instagram", "WhatsApp", "Facebook", "Website", "Referral", "Walk-in"], ct);
+        await EnsureLeadSourceAsync(BotService.SourceName, ct);
         await SeedListAsync(db.CancellationReasons,
             ["Customer request", "Booked elsewhere", "No longer interested", "Doctor unavailable", "Other"], ct);
         await SeedListAsync(db.PaymentMethods, ["Cash", "Card", "Bank Transfer", "Other"], ct);
@@ -104,6 +105,15 @@ public class DbSeeder(AppDbContext db, IConfiguration config, ILogger<DbSeeder> 
         await db.SaveChangesAsync(ct);
     }
 
+    /// <summary>Adds a lead source the app relies on (once; an admin may rename or deactivate it later).</summary>
+    private async Task EnsureLeadSourceAsync(string name, CancellationToken ct)
+    {
+        if (await db.LeadSources.AnyAsync(s => s.Name == name, ct)) return;
+        var order = await db.LeadSources.MaxAsync(s => (int?)s.DisplayOrder, ct) ?? 0;
+        db.LeadSources.Add(new LeadSource { Name = name, IsActive = true, DisplayOrder = order + 1 });
+        await db.SaveChangesAsync(ct);
+    }
+
     /// <summary>Adds a row for any built-in capture field that doesn't have one yet.</summary>
     private async Task SeedCaptureFieldsAsync(CancellationToken ct)
     {
@@ -132,6 +142,8 @@ public class DbSeeder(AppDbContext db, IConfiguration config, ILogger<DbSeeder> 
             [SettingKeys.LogoUrl] = "",
             [SettingKeys.Currency] = "AED",
             [SettingKeys.TimeZone] = "Asia/Dubai",
+            [SettingKeys.OpeningHours] = BookingHoursService.DefaultDaysJson,
+            [SettingKeys.BotBookingMinutes] = BookingHoursService.DefaultBotMinutes.ToString(),
         };
 
         var existing = await db.SystemSettings.Select(s => s.Key).ToListAsync(ct);

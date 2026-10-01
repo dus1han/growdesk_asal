@@ -93,7 +93,9 @@ export interface CaptureField {
   displayOrder: number;
 }
 
-/** A connection the CRM Capture toolbar signs in with (backend DTOs/CaptureDtos.cs). */
+export type ConnectionKind = "Toolbar" | "Bot";
+
+/** A connection the Capture toolbar or the WhatsApp BOT signs in with (backend DTOs/CaptureDtos.cs). */
 export interface CaptureClient {
   id: number;
   name: string;
@@ -105,6 +107,21 @@ export interface CaptureClient {
   revokedAt: string | null;
   /** The toolbar version this PC last connected with. */
   extensionVersion: string | null;
+  kind: ConnectionKind;
+}
+
+/** One weekday's opening hours ("HH:mm"), backend DTOs/BotDtos.cs. */
+export interface OpeningDay {
+  day: string;
+  isOpen: boolean;
+  from: string | null;
+  to: string | null;
+}
+
+/** When the WhatsApp BOT may book, and how long its bookings are. */
+export interface BookingHours {
+  botBookingMinutes: number;
+  days: OpeningDay[];
 }
 
 /** Returned once on creation: the secret can't be read again. */

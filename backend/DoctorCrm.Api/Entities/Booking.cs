@@ -58,6 +58,9 @@ public class Booking : AuditableEntity
 
     public int? CreatedById { get; set; }
 
+    /// <summary>Set when something other than a GrowDesk user made the booking, e.g. "WhatsApp BOT".</summary>
+    public string? Source { get; set; }
+
     public ICollection<BookingTreatment> Treatments { get; set; } = new List<BookingTreatment>();
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

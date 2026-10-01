@@ -60,6 +60,8 @@ export interface BookingDetail {
   rescheduledAt: string | null;
   noShowAt: string | null;
   createdAt: string;
+  /** "WhatsApp BOT" when the bot made the booking; null when made in GrowDesk. */
+  source: string | null;
 }
 
 export interface BookingQuery {
@@ -87,4 +89,24 @@ export interface Locale {
   currency: string;
   timeZone: string;
   today: string;
+}
+
+/** Time marked as not available: every day from startDate to endDate, all day when the times are null. */
+export interface CalendarBlock {
+  id: number;
+  startDate: string;
+  endDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  reason: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface CreateCalendarBlock {
+  startDate: string;
+  endDate: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  reason: string | null;
 }

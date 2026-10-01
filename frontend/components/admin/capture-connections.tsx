@@ -20,15 +20,53 @@ import { copyText } from "@/lib/clipboard";
 import { isNewerVersion } from "@/lib/version";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { CaptureClient, CaptureClientCreated } from "@/types/admin";
+import type { CaptureClient, CaptureClientCreated, ConnectionKind } from "@/types/admin";
+
+/** Wording for each kind of connection. */
+const COPY: Record<
+  ConnectionKind,
+  {
+    description: string;
+    emptyTitle: string;
+    emptyDescription: string;
+    addDescription: string;
+    readyDescription: (name: string) => string;
+    placeholder: string;
+    hint: string;
+    revoked: string;
+  }
+> = {
+  Toolbar: {
+    description: "Each PC running the toolbar signs in with its own connection. Revoke one to cut that PC off straight away.",
+    emptyTitle: "No connections yet",
+    emptyDescription: "Add one for each PC that runs the GrowDesk Capture toolbar, then enter its details in the toolbar's settings.",
+    addDescription: "One connection per PC that runs the toolbar.",
+    readyDescription: (name) => `Enter these in the GrowDesk Capture settings on ${name}.`,
+    placeholder: "Reception PC",
+    hint: "Which PC or person this is for, so you know what to revoke later.",
+    revoked: "can no longer send leads",
+  },
+  Bot: {
+    description: "The WhatsApp BOT signs in with its own connection. Revoke it to stop the bot straight away.",
+    emptyTitle: "No bot connection yet",
+    emptyDescription: "Add a connection and give its details to the bot's developer, with the API guide.",
+    addDescription: "Usually one connection for your WhatsApp BOT.",
+    readyDescription: (name) => `Give these to the developer of ${name}. The bot uses them to sign in.`,
+    placeholder: "WhatsApp BOT",
+    hint: "Which bot this is for, so you know what to revoke later.",
+    revoked: "can no longer create customers or bookings",
+  },
+};
 
 /**
- * The connections the GrowDesk Capture toolbar signs in with: one per PC, each with its own client
- * ID and secret, so a lost or retired PC can be cut off without touching the others.
+ * The connections the GrowDesk Capture toolbar (one per PC) or the WhatsApp BOT signs in with,
+ * each with its own client ID and secret, so one can be cut off without touching the others.
  */
-export function CaptureConnections() {
-  const { data, isPending } = useCaptureClients();
+export function CaptureConnections({ kind = "Toolbar" }: { kind?: ConnectionKind }) {
+  const { data: all, isPending } = useCaptureClients();
   const [adding, setAdding] = useState(false);
+  const copy = COPY[kind];
+  const data = all?.filter((c) => c.kind === kind);
   const active = data?.filter((c) => c.isActive) ?? [];
   const revoked = data?.filter((c) => !c.isActive) ?? [];
 
@@ -36,7 +74,7 @@ export function CaptureConnections() {
     <Card className="mt-6 overflow-hidden">
       <CardHeader
         title="Connections"
-        description="Each PC running the toolbar signs in with its own connection. Revoke one to cut that PC off straight away."
+        description={copy.description}
         action={
           <Button size="sm" onClick={() => setAdding(true)}>
             <Plus className="size-4" /> Add connection
@@ -51,8 +89,8 @@ export function CaptureConnections() {
       ) : !data || data.length === 0 ? (
         <EmptyState
           icon={Plug}
-          title="No connections yet"
-          description="Add one for each PC that runs the GrowDesk Capture toolbar, then enter its details in the toolbar's settings."
+          title={copy.emptyTitle}
+          description={copy.emptyDescription}
           className="py-10"
         />
       ) : (
@@ -62,7 +100,7 @@ export function CaptureConnections() {
           ))}
         </ul>
       )}
-      <AddConnectionDrawer open={adding} onClose={() => setAdding(false)} />
+      <AddConnectionDrawer kind={kind} open={adding} onClose={() => setAdding(false)} />
     </Card>
   );
 }
@@ -112,7 +150,7 @@ function ConnectionRow({ client }: { client: CaptureClient }) {
           onClick={() => {
             if (!confirming) return setConfirming(true);
             revoke.mutate(client.id, {
-              onSuccess: () => toast.success(`${client.name} can no longer send leads`),
+              onSuccess: () => toast.success(`${client.name} ${COPY[client.kind].revoked}`),
               onError: toastError,
             });
           }}
@@ -127,7 +165,7 @@ function ConnectionRow({ client }: { client: CaptureClient }) {
 
 const schema = z.object({ name: z.string().trim().min(1, "Give the connection a name, e.g. Reception PC.").max(100) });
 
-function AddConnectionDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function AddConnectionDrawer({ kind, open, onClose }: { kind: ConnectionKind; open: boolean; onClose: () => void }) {
   const [created, setCreated] = useState<CaptureClientCreated | null>(null);
   const close = () => {
     setCreated(null);
@@ -138,7 +176,7 @@ function AddConnectionDrawer({ open, onClose }: { open: boolean; onClose: () => 
       open={open}
       onOpenChange={(o) => !o && close()}
       title={created ? "Connection ready" : "Add connection"}
-      description={created ? `Enter these in the GrowDesk Capture settings on ${created.client.name}.` : "One connection per PC that runs the toolbar."}
+      description={created ? COPY[kind].readyDescription(created.client.name) : COPY[kind].addDescription}
       footer={
         created ? (
           <Button onClick={close}>Done</Button>
@@ -154,23 +192,23 @@ function AddConnectionDrawer({ open, onClose }: { open: boolean; onClose: () => 
         )
       }
     >
-      {open && (created ? <CreatedDetails created={created} /> : <AddConnectionForm onCreated={setCreated} />)}
+      {open && (created ? <CreatedDetails created={created} /> : <AddConnectionForm kind={kind} onCreated={setCreated} />)}
     </Drawer>
   );
 }
 
-function AddConnectionForm({ onCreated }: { onCreated: (c: CaptureClientCreated) => void }) {
+function AddConnectionForm({ kind, onCreated }: { kind: ConnectionKind; onCreated: (c: CaptureClientCreated) => void }) {
   const { create } = useCaptureClientMutations();
   const {
     register,
     handleSubmit,
     setError,
     formState: { errors },
-  } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: { name: "" } });
+  } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: { name: kind === "Bot" ? "WhatsApp BOT" : "" } });
 
   const onSubmit = handleSubmit(async ({ name }) => {
     try {
-      onCreated(await create.mutateAsync(name.trim()));
+      onCreated(await create.mutateAsync({ name: name.trim(), kind }));
     } catch (error) {
       if (error instanceof ApiError && error.fieldErrors.some((f) => f.field === "name")) {
         setError("name", { message: error.message });
@@ -182,8 +220,8 @@ function AddConnectionForm({ onCreated }: { onCreated: (c: CaptureClientCreated)
 
   return (
     <form id="capture-connection-form" onSubmit={onSubmit} className="space-y-5" noValidate>
-      <Field label="Name" required hint="Which PC or person this is for, so you know what to revoke later." error={errors.name?.message}>
-        {(p) => <Input {...p} autoFocus placeholder="Reception PC" {...register("name")} />}
+      <Field label="Name" required hint={COPY[kind].hint} error={errors.name?.message}>
+        {(p) => <Input {...p} autoFocus placeholder={COPY[kind].placeholder} {...register("name")} />}
       </Field>
     </form>
   );
@@ -193,6 +231,7 @@ function CreatedDetails({ created }: { created: CaptureClientCreated }) {
   const [origin, setOrigin] = useState("");
   useEffect(() => setOrigin(window.location.origin), []); // eslint-disable-line react-hooks/set-state-in-effect -- read once after mount
   const insecure = origin.startsWith("http://");
+  const bot = created.client.kind === "Bot";
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
@@ -203,15 +242,15 @@ function CreatedDetails({ created }: { created: CaptureClientCreated }) {
           connection and add a new one.
         </p>
       </div>
-      <CopyField label="Server" value={origin} />
+      {bot ? <CopyField label="API address" value={`${origin}/api/bot`} mono /> : <CopyField label="Server" value={origin} />}
       <CopyField label="Client ID" value={created.client.clientId} mono />
       <CopyField label="Client secret" value={created.clientSecret} mono secret />
-      {insecure && (
+      {bot && insecure && (
         <div className="flex items-start gap-3 rounded-2xl border border-line bg-surface-muted/60 p-4 text-xs text-muted">
           <ShieldAlert className="mt-0.5 size-4 shrink-0" />
           <p>
-            This CRM is served over plain HTTP. The toolbar only sends leads over HTTPS, so it can connect once the CRM has a
-            domain with HTTPS.
+            GrowDesk is served over plain HTTP, so the bot&apos;s secret and customer details travel unencrypted. Move GrowDesk
+            to a domain with HTTPS before the bot goes live.
           </p>
         </div>
       )}

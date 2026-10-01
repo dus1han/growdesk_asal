@@ -5,8 +5,10 @@ import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api/client";
 import type {
   AdminUser,
+  BookingHours,
   CaptureClient,
   CaptureClientCreated,
+  ConnectionKind,
   CaptureField,
   CreateUser,
   CustomField,
@@ -188,6 +190,23 @@ export function useSaveCaptureFields() {
   });
 }
 
+// ---- Opening hours (WhatsApp BOT) ----------------------------------------------------------------
+
+export function useBookingHours() {
+  return useQuery({ queryKey: ["booking-hours"], queryFn: ({ signal }) => api.get<BookingHours>("/admin/booking-hours", { signal }) });
+}
+
+export function useSaveBookingHours() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (hours: BookingHours) => api.put<BookingHours>("/admin/booking-hours", hours),
+    onSuccess: (data) => {
+      qc.setQueryData(["booking-hours"], data);
+      qc.setQueryData(["opening-hours"], data);
+    },
+  });
+}
+
 // ---- Capture tool connections -------------------------------------------------------------------
 
 export function useCaptureClients() {
@@ -199,7 +218,7 @@ export function useCaptureClientMutations() {
   const refresh = () => void qc.invalidateQueries({ queryKey: ["capture-clients"] });
   return {
     create: useMutation({
-      mutationFn: (name: string) => api.post<CaptureClientCreated>("/admin/capture-clients", { name }),
+      mutationFn: (v: { name: string; kind: ConnectionKind }) => api.post<CaptureClientCreated>("/admin/capture-clients", v),
       onSuccess: refresh,
     }),
     revoke: useMutation({

@@ -1,10 +1,12 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using DoctorCrm.Api.Authentication;
 using DoctorCrm.Api.Authorization;
 using DoctorCrm.Api.Controllers;
 using DoctorCrm.Api.Data;
 using DoctorCrm.Api.DTOs;
+using DoctorCrm.Api.Entities;
 using DoctorCrm.Api.Middleware;
 using DoctorCrm.Api.Services;
 using DoctorCrm.Api.Validators;
@@ -118,6 +120,7 @@ builder.Services.AddOptions<JwtBearerOptions>(CaptureAuth.Scheme)
                     ctx.Fail("Capture connection revoked.");
                     return;
                 }
+                ctx.Principal!.AddIdentity(new ClaimsIdentity([new Claim(CaptureAuth.KindClaim, client.Kind.ToString())]));
                 if (client.LastUsedAt is null || client.LastUsedAt < DateTime.UtcNow.AddMinutes(-1))
                 {
                     client.LastUsedAt = DateTime.UtcNow;
@@ -128,7 +131,12 @@ builder.Services.AddOptions<JwtBearerOptions>(CaptureAuth.Scheme)
             {
                 ctx.HandleResponse();
                 ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail("Missing, expired or revoked capture token. Request a new one at /api/capture/token."));
+                await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail("Missing, expired or revoked token. Request a new one at /api/capture/token (toolbar) or /api/bot/token (bot)."));
+            },
+            OnForbidden = async ctx =>
+            {
+                ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail("This connection can't use this API: toolbar connections use /api/capture, bot connections use /api/bot."));
             },
         };
     });
@@ -142,7 +150,13 @@ builder.Services.AddAuthorization(o =>
     o.AddPolicy(CaptureAuth.Policy, p => p
         .AddAuthenticationSchemes(CaptureAuth.Scheme)
         .RequireAuthenticatedUser()
-        .RequireClaim(CaptureAuth.ClientClaim));
+        .RequireClaim(CaptureAuth.ClientClaim)
+        .RequireClaim(CaptureAuth.KindClaim, nameof(CaptureClientKind.Toolbar)));
+    o.AddPolicy(CaptureAuth.BotPolicy, p => p
+        .AddAuthenticationSchemes(CaptureAuth.Scheme)
+        .RequireAuthenticatedUser()
+        .RequireClaim(CaptureAuth.ClientClaim)
+        .RequireClaim(CaptureAuth.KindClaim, nameof(CaptureClientKind.Bot)));
 });
 
 // ---- Rate limiting ------------------------------------------------------------
@@ -190,6 +204,10 @@ builder.Services.AddScoped<DashboardService>();
 builder.Services.AddSingleton<CaptureTokenService>();
 builder.Services.AddScoped<CaptureClientService>();
 builder.Services.AddScoped<CaptureService>();
+builder.Services.AddScoped<BookingHoursService>();
+builder.Services.AddScoped<BotService>();
+builder.Services.AddScoped<CalendarBlockService>();
+builder.Services.AddSingleton<LiveEvents>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 builder.Services.AddControllers(o => o.Filters.Add<ValidationFilter>())

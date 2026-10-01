@@ -24,6 +24,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CustomerTreatment> CustomerTreatments => Set<CustomerTreatment>();
     public DbSet<CustomerCustomFieldValue> CustomerCustomFieldValues => Set<CustomerCustomFieldValue>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<CalendarBlock> CalendarBlocks => Set<CalendarBlock>();
     public DbSet<BookingTreatment> BookingTreatments => Set<BookingTreatment>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<CaptureClient> CaptureClients => Set<CaptureClient>();
@@ -156,6 +157,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Notes).HasMaxLength(2000);
             e.Property(x => x.DoctorNotes).HasMaxLength(4000);
             e.Property(x => x.CancellationNote).HasMaxLength(1000);
+            e.Property(x => x.Source).HasMaxLength(40);
             e.Property(x => x.ConsultationCharge).HasPrecision(12, 2);
 
             // Calendar ranges and the per-doctor overlap check.
@@ -200,6 +202,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Value).HasMaxLength(2000).IsRequired();
         });
 
+        b.Entity<CalendarBlock>(e =>
+        {
+            e.Property(x => x.Reason).HasMaxLength(200);
+            e.HasIndex(x => new { x.StartDate, x.EndDate });
+            e.HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.SetNull);
+        });
+
         b.Entity<CaptureClient>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(100).IsRequired();
@@ -207,6 +216,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.ClientId).IsUnique();
             e.Property(x => x.SecretHash).HasMaxLength(128).IsRequired();
             e.Property(x => x.ExtensionVersion).HasMaxLength(20);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
             e.HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.SetNull);
         });
 

@@ -14,6 +14,15 @@ public static class CaptureAuth
     public const string Scheme = "Capture";
     public const string Policy = "capture";
     public const string ClientClaim = "capture_client";
+
+    /// <summary>The WhatsApp BOT API's policy: a token from a Bot connection.</summary>
+    public const string BotPolicy = "bot";
+
+    /// <summary>
+    /// The connection's kind (Toolbar or Bot), added from the database when the token is checked,
+    /// so a toolbar's token can't call the bot API and the other way round.
+    /// </summary>
+    public const string KindClaim = "capture_kind";
     public const int TokenMinutes = 15;
 
     public static string Audience(JwtOptions options) => options.Audience + ":capture";

@@ -112,16 +112,18 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
                 p.Id, p.Amount, p.Status.ToString(),
                 p.PaymentMethod is null ? null : new NamedRef(p.PaymentMethod.Id, p.PaymentMethod.Name),
                 p.PaymentDate, p.CreatedBy?.FullName, p.CreatedAt)).ToList(),
-            b.CompletedAt, b.CancelledAt, b.RescheduledAt, b.NoShowAt, b.CreatedAt);
+            b.CompletedAt, b.CancelledAt, b.RescheduledAt, b.NoShowAt, b.CreatedAt, b.Source);
     }
 
-    public async Task<BookingDetailDto> CreateAsync(CreateBookingRequest r, int? userId, CancellationToken ct)
+    /// <param name="source">Set when made outside GrowDesk, e.g. by the WhatsApp BOT.</param>
+    public async Task<BookingDetailDto> CreateAsync(CreateBookingRequest r, int? userId, CancellationToken ct, string? source = null)
     {
         var customer = await db.Customers.SingleOrDefaultAsync(c => c.Id == r.CustomerId && c.IsActive, ct)
             ?? throw new BusinessRuleException("Choose a customer.", field: "customerId");
 
         await EnsureDoctorAsync(r.DoctorId, null, ct);
         var treatmentIds = await ValidateTreatmentsAsync(r.TreatmentIds, new HashSet<int>(), ct);
+        await EnsureNotBlockedAsync(r.Date, r.StartTime, r.EndTime, ct);
         await EnsureNoOverlapAsync(r.Date, r.StartTime, r.EndTime, r.DoctorId, excludeId: null, ct);
 
         var booking = new Booking
@@ -133,6 +135,7 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
             EndTime = r.EndTime,
             Notes = Clean(r.Notes),
             CreatedById = userId,
+            Source = source,
         };
         foreach (var id in treatmentIds) booking.Treatments.Add(new BookingTreatment { TreatmentId = id });
         db.Bookings.Add(booking);
@@ -142,7 +145,7 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
 
         await db.SaveChangesAsync(ct);
         audit.Record(userId, "Booking Created", nameof(Booking), booking.Id,
-            new { customerId = customer.Id, date = r.Date, start = r.StartTime });
+            new { customerId = customer.Id, date = r.Date, start = r.StartTime, source });
         await db.SaveChangesAsync(ct);
         return await GetAsync(booking.Id, ct);
     }
@@ -223,11 +226,12 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
     /// The original becomes Rescheduled with no charge; a new Booked consultation keeps the
     /// customer, treatments and doctor and points back via OriginalBookingId (spec §25).
     /// </summary>
-    public async Task<BookingDetailDto> RescheduleAsync(int id, RescheduleBookingRequest r, int? userId, CancellationToken ct)
+    public async Task<BookingDetailDto> RescheduleAsync(int id, RescheduleBookingRequest r, int? userId, CancellationToken ct, string? source = null)
     {
         var original = await LoadBookedAsync(id, "rescheduled", ct);
         var doctorId = r.DoctorId ?? original.DoctorId;
         await EnsureDoctorAsync(doctorId, original.DoctorId, ct);
+        await EnsureNotBlockedAsync(r.Date, r.StartTime, r.EndTime, ct);
         await EnsureNoOverlapAsync(r.Date, r.StartTime, r.EndTime, doctorId, excludeId: original.Id, ct);
 
         original.Status = BookingStatus.Rescheduled;
@@ -244,13 +248,14 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
             Notes = original.Notes,
             OriginalBookingId = original.Id,
             CreatedById = userId,
+            Source = source,
         };
         foreach (var t in original.Treatments) replacement.Treatments.Add(new BookingTreatment { TreatmentId = t.TreatmentId });
         db.Bookings.Add(replacement);
         await db.SaveChangesAsync(ct);
 
         audit.Record(userId, "Booking Rescheduled", nameof(Booking), original.Id,
-            new { from = new { date = original.BookingDate, start = original.StartTime }, to = new { date = r.Date, start = r.StartTime }, newBookingId = replacement.Id });
+            new { from = new { date = original.BookingDate, start = original.StartTime }, to = new { date = r.Date, start = r.StartTime }, newBookingId = replacement.Id, source });
         await db.SaveChangesAsync(ct);
         return await GetAsync(replacement.Id, ct);
     }
@@ -312,6 +317,16 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
             throw new BusinessRuleException(
                 $"This time overlaps {conflict.CustomerName}'s consultation ({conflict.StartTime:HH\\:mm}–{conflict.EndTime:HH\\:mm}).",
                 StatusCodes.Status409Conflict, "startTime") { Details = conflict };
+    }
+
+    /// <summary>Time marked as not available on the calendar can't be booked by anyone.</summary>
+    private async Task EnsureNotBlockedAsync(DateOnly date, TimeOnly start, TimeOnly end, CancellationToken ct)
+    {
+        var block = await CalendarBlockService.Covering(db.CalendarBlocks.AsNoTracking(), date, start, end).FirstOrDefaultAsync(ct);
+        if (block is not null)
+            throw new BusinessRuleException(
+                $"This time is {CalendarBlockService.Describe(block)}. Choose another time, or remove the block on the calendar first.",
+                StatusCodes.Status409Conflict, "startTime");
     }
 
     private async Task EnsureDoctorAsync(int? doctorId, int? currentDoctorId, CancellationToken ct)

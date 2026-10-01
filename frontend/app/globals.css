@@ -169,6 +169,16 @@
 .gd-calendar .fc .fc-list-event {
   cursor: pointer;
 }
+/* Time outside opening hours, and time marked as not available. */
+.gd-calendar .fc .fc-non-business {
+  background: rgb(148 163 184 / 0.1);
+}
+.gd-calendar .fc .gd-block {
+  border-width: 1px 1px 1px 3px;
+  border-style: solid;
+  background-image: repeating-linear-gradient(135deg, rgb(148 163 184 / 0.16) 0 6px, rgb(148 163 184 / 0.05) 6px 12px) !important;
+  box-shadow: none;
+}
 .gd-calendar .fc .fc-list-empty {
   background: var(--surface);
   color: var(--muted);

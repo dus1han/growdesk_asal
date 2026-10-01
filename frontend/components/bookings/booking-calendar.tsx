@@ -7,15 +7,17 @@ import listPlugin from "@fullcalendar/list";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarOff, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FilterMenu } from "@/components/ui/filter-menu";
 import { Switch } from "@/components/ui/form-controls";
-import { useBookings, useDoctorOptions } from "@/lib/api/bookings";
+import { useBookings, useCalendarBlocks, useDoctorOptions, useOpeningHours } from "@/lib/api/bookings";
 import { isoDate } from "@/lib/dates";
+import { businessHours } from "@/lib/opening-hours";
 import { cn } from "@/lib/utils";
-import type { BookingListItem } from "@/types/bookings";
+import type { BookingListItem, CalendarBlock } from "@/types/bookings";
+import { BlockTimeDrawer, blockTime } from "./block-time-drawer";
 import { BOOKING_STATUS, hhmm } from "./booking-status";
 
 const VIEWS = [
@@ -30,9 +32,11 @@ interface Props {
   onOpenBooking: (id: number) => void;
   /** Called when an empty slot is clicked (only when the user may book). */
   onPickSlot?: (slot: { date: string; startTime: string; endTime: string }) => void;
+  /** The user may mark time as not available. */
+  canBlock?: boolean;
 }
 
-export function BookingCalendar({ onOpenBooking, onPickSlot }: Props) {
+export function BookingCalendar({ onOpenBooking, onPickSlot, canBlock = false }: Props) {
   const ref = useRef<FullCalendar>(null);
   // Phones start on the day view; a week of columns is unreadable at 390px.
   const [view, setView] = useState<ViewId>(() =>
@@ -43,6 +47,10 @@ export function BookingCalendar({ onOpenBooking, onPickSlot }: Props) {
   const [showInactive, setShowInactive] = useState(false);
   const [doctor, setDoctor] = useState<string | undefined>();
   const doctors = useDoctorOptions();
+  const openingHours = useOpeningHours();
+  const blocks = useCalendarBlocks(range?.from, range?.to);
+  const [newBlockOn, setNewBlockOn] = useState<string | null>(null);
+  const [openBlock, setOpenBlock] = useState<CalendarBlock | null>(null);
 
   const { data, isFetching } = useBookings(
     {
@@ -54,6 +62,33 @@ export function BookingCalendar({ onOpenBooking, onPickSlot }: Props) {
     },
     range !== null,
   );
+
+  // A block covers each day of its range: the whole day, or its times on every day.
+  const blockEvents = useMemo<EventInput[]>(() => {
+    if (!range) return [];
+    const out: EventInput[] = [];
+    for (const b of blocks.data ?? []) {
+      const first = b.startDate > range.from ? b.startDate : range.from;
+      const last = b.endDate < range.to ? b.endDate : range.to;
+      for (let d = parseDay(first); isoDate(d) <= last; d.setDate(d.getDate() + 1)) {
+        const day = isoDate(d);
+        const next = new Date(d);
+        next.setDate(next.getDate() + 1);
+        out.push({
+          id: `block-${b.id}-${day}`,
+          title: b.reason ?? "Not available",
+          start: b.startTime ? `${day}T${hhmm(b.startTime)}` : `${day}T00:00`,
+          end: b.endTime ? `${day}T${hhmm(b.endTime)}` : `${isoDate(next)}T00:00`,
+          classNames: ["gd-block"],
+          backgroundColor: "transparent",
+          borderColor: "#94a3b8",
+          textColor: "#475569",
+          extendedProps: { block: b },
+        });
+      }
+    }
+    return out;
+  }, [blocks.data, range]);
 
   const events = useMemo<EventInput[]>(
     () =>
@@ -124,6 +159,11 @@ export function BookingCalendar({ onOpenBooking, onPickSlot }: Props) {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {canBlock && (
+            <Button variant="secondary" size="sm" onClick={() => setNewBlockOn(range?.from && range.from > isoDate(new Date()) ? range.from : isoDate(new Date()))}>
+              <CalendarOff className="size-4" /> Block time
+            </Button>
+          )}
           {doctors.data && doctors.data.length > 0 && (
             <FilterMenu label="Doctor" value={doctor} onChange={setDoctor} options={doctors.data.map((d) => ({ value: String(d.id), label: d.name }))} />
           )}
@@ -169,19 +209,51 @@ export function BookingCalendar({ onOpenBooking, onPickSlot }: Props) {
           dayMaxEvents={3}
           eventTimeFormat={{ hour: "numeric", minute: "2-digit", meridiem: "short" }}
           slotLabelFormat={{ hour: "numeric", minute: "2-digit", meridiem: "short" }}
-          events={events}
+          events={[...blockEvents, ...events]}
+          businessHours={businessHours(openingHours.data)}
           datesSet={onDatesSet}
           dateClick={onPickSlot ? onDateClick : undefined}
-          eventClick={(arg: EventClickArg) => onOpenBooking(Number(arg.event.id))}
+          eventClick={(arg: EventClickArg) => {
+            const block = arg.event.extendedProps.block as CalendarBlock | undefined;
+            if (block) setOpenBlock(block);
+            else onOpenBooking(Number(arg.event.id));
+          }}
           eventContent={renderEvent}
           noEventsContent="No consultations in this period."
         />
       </div>
+      <BlockTimeDrawer
+        newOn={newBlockOn}
+        block={openBlock}
+        canManage={canBlock}
+        onClose={() => {
+          setNewBlockOn(null);
+          setOpenBlock(null);
+        }}
+      />
     </div>
   );
 }
 
+function parseDay(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function renderEvent(arg: EventContentArg) {
+  const block = arg.event.extendedProps.block as CalendarBlock | undefined;
+  if (block) {
+    return (
+      <div className="flex h-full flex-col overflow-hidden px-1.5 py-1 text-[11px] leading-tight">
+        <span className="flex items-center gap-1 font-semibold text-slate-600">
+          <CalendarOff className="size-3 shrink-0" /> Not available
+        </span>
+        <span className="truncate text-slate-500">
+          {block.reason ?? blockTime(block)}
+        </span>
+      </div>
+    );
+  }
   const b = arg.event.extendedProps.booking as BookingListItem;
   const s = BOOKING_STATUS[b.status];
   const list = arg.view.type.startsWith("list");

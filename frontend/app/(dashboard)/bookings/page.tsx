@@ -110,7 +110,7 @@ function Bookings() {
 
       <Card className="overflow-hidden">
         {view === "calendar" ? (
-          <BookingCalendar onOpenBooking={setOpenId} onPickSlot={canBook ? (slot) => setBooking(slot) : undefined} />
+          <BookingCalendar onOpenBooking={setOpenId} onPickSlot={canBook ? (slot) => setBooking(slot) : undefined} canBlock={canBook} />
         ) : (
           <BookingList initialTab={initialTab} onOpen={setOpenId} onBook={canBook ? () => setBooking({}) : undefined} />
         )}

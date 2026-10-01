@@ -15,4 +15,10 @@ public static class SettingKeys
     public const string LogoUrl = "branding.logo_url";
     public const string Currency = "locale.currency";
     public const string TimeZone = "locale.time_zone";
+
+    /// <summary>Weekly opening hours (JSON), used for the WhatsApp BOT's free times and bookings.</summary>
+    public const string OpeningHours = "booking.opening_hours";
+
+    /// <summary>Length in minutes of a consultation booked by the WhatsApp BOT.</summary>
+    public const string BotBookingMinutes = "booking.bot_minutes";
 }

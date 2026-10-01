@@ -2,7 +2,8 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
-import type { BookingDetail, BookingListItem, BookingQuery, Locale } from "@/types/bookings";
+import type { BookingHours } from "@/types/admin";
+import type { BookingDetail, BookingListItem, BookingQuery, CalendarBlock, CreateCalendarBlock, Locale } from "@/types/bookings";
 import type { CustomerListItem, NamedRef, Paged } from "@/types/customers";
 
 function qs(query: object) {
@@ -42,6 +43,38 @@ export function useLocale() {
     queryFn: ({ signal }) => api.get<Locale>("/settings/locale", { signal }),
     staleTime: 10 * 60_000,
   });
+}
+
+/** The clinic's weekly opening hours, for shading closed time on the calendar. */
+export function useOpeningHours() {
+  return useQuery({
+    queryKey: ["opening-hours"],
+    queryFn: ({ signal }) => api.get<BookingHours>("/calendar/opening-hours", { signal }),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Time marked as not available between two dates (inclusive). */
+export function useCalendarBlocks(from: string | undefined, to: string | undefined) {
+  return useQuery({
+    queryKey: ["calendar-blocks", from, to],
+    queryFn: ({ signal }) => api.get<CalendarBlock[]>(`/calendar/blocks?${qs({ from, to })}`, { signal }),
+    enabled: !!from && !!to,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useCalendarBlockMutations() {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: ["calendar-blocks"] });
+  return {
+    create: useMutation({
+      mutationFn: (input: CreateCalendarBlock) =>
+        api.post<{ block: CalendarBlock; bookedConsultations: number }>("/calendar/blocks", input),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({ mutationFn: (id: number) => api.delete<null>(`/calendar/blocks/${id}`), onSuccess: refresh }),
+  };
 }
 
 /** Customer autocomplete for the booking form. */

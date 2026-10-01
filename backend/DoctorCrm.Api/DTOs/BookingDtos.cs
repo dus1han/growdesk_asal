@@ -68,7 +68,9 @@ public record BookingDetailDto(
     DateTime? CancelledAt,
     DateTime? RescheduledAt,
     DateTime? NoShowAt,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    /// <summary>"WhatsApp BOT" when the bot made the booking; null when made in GrowDesk.</summary>
+    string? Source);
 
 public record CreateBookingRequest(
     int CustomerId,

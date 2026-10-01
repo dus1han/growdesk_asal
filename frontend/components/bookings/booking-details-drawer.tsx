@@ -289,7 +289,10 @@ function Details({
         </div>
       )}
 
-      <p className="text-xs text-muted">Booked {formatDateTime(booking.createdAt)}</p>
+      <p className="text-xs text-muted">
+        Booked {formatDateTime(booking.createdAt)}
+        {booking.source && <> by {booking.source}</>}
+      </p>
       <RecordPaymentDrawer
         pending={recording && payment ? { bookingId: booking.id, customerName: booking.customer.name, amount: payment.amount } : null}
         onClose={() => setRecording(false)}

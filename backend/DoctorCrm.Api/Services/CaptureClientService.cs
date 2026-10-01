@@ -15,12 +15,15 @@ public class CaptureClientService(AppDbContext db, AuditService audit, CaptureTo
         await db.CaptureClients.AsNoTracking()
             .OrderByDescending(c => c.IsActive).ThenByDescending(c => c.CreatedAt)
             .Select(c => new CaptureClientDto(c.Id, c.Name, c.ClientId, c.IsActive, c.CreatedAt,
-                c.CreatedBy != null ? c.CreatedBy.FullName : null, c.LastUsedAt, c.RevokedAt, c.ExtensionVersion))
+                c.CreatedBy != null ? c.CreatedBy.FullName : null, c.LastUsedAt, c.RevokedAt, c.ExtensionVersion, c.Kind.ToString()))
             .ToListAsync(ct);
 
     public async Task<CaptureClientCreatedDto> CreateAsync(CreateCaptureClientRequest request, int? userId, CancellationToken ct)
     {
         var name = request.Name.Trim();
+        var kind = CaptureClientKind.Toolbar;
+        if (!string.IsNullOrWhiteSpace(request.Kind) && !Enum.TryParse(request.Kind, ignoreCase: true, out kind))
+            throw new BusinessRuleException("Choose Toolbar or Bot.", field: "kind");
         if (await db.CaptureClients.AnyAsync(c => c.IsActive && c.Name.ToLower() == name.ToLower(), ct))
             throw BusinessRuleException.Conflict("An active connection already has this name.", "name");
 
@@ -32,11 +35,12 @@ public class CaptureClientService(AppDbContext db, AuditService audit, CaptureTo
             SecretHash = Hash(secret),
             CreatedAt = DateTime.UtcNow,
             CreatedById = userId,
+            Kind = kind,
         };
         db.CaptureClients.Add(client);
         await db.SaveChangesAsync(ct);
 
-        audit.Record(userId, "Capture Connection Created", nameof(CaptureClient), client.Id, new { client.Name, client.ClientId });
+        audit.Record(userId, "Capture Connection Created", nameof(CaptureClient), client.Id, new { client.Name, client.ClientId, kind = kind.ToString() });
         await db.SaveChangesAsync(ct);
         return new CaptureClientCreatedDto((await ListAsync(ct)).Single(c => c.Id == client.Id), secret);
     }

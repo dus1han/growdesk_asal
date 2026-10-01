@@ -1,5 +1,15 @@
 namespace DoctorCrm.Api.Entities;
 
+/// <summary>What a connection is for. Each kind's token only works on its own API.</summary>
+public enum CaptureClientKind
+{
+    /// <summary>The GrowDesk Capture toolbar (/api/capture).</summary>
+    Toolbar,
+
+    /// <summary>A WhatsApp chatbot that saves leads and books consultations (/api/bot).</summary>
+    Bot,
+}
+
 /// <summary>
 /// A connection the external capture tool signs in with (spec §36): one per PC or browser, so a
 /// lost machine can be revoked on its own. The secret is shown once when the connection is
@@ -16,6 +26,8 @@ public class CaptureClient
     public string ClientId { get; set; } = string.Empty;
 
     public string SecretHash { get; set; } = string.Empty;
+
+    public CaptureClientKind Kind { get; set; } = CaptureClientKind.Toolbar;
 
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
