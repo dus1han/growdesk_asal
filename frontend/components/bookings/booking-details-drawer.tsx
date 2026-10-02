@@ -170,11 +170,21 @@ function Details({
         </div>
       </div>
 
-      {booking.notes && (
-        <NoteCard label="Consultation notes" icon={StickyNote}>
-          {booking.notes}
-        </NoteCard>
-      )}
+      {/* Always shown, so it's clear whether there is a note; empty ones offer to add one. */}
+      <NoteCard
+        label="Consultation notes"
+        icon={StickyNote}
+        className={cn(!booking.notes && "border-line bg-surface-muted/40")}
+        action={
+          !booking.notes && isBooked && canManage ? (
+            <button type="button" onClick={onEdit} className="text-xs font-semibold text-brand hover:text-brand-strong">
+              Add note
+            </button>
+          ) : undefined
+        }
+      >
+        {booking.notes ?? <span className="text-muted">No notes for this consultation.</span>}
+      </NoteCard>
 
       {(booking.rescheduledFrom || booking.rescheduledTo) && (
         <div className="space-y-2">
@@ -333,18 +343,23 @@ function NoteCard({
   label,
   icon: Icon,
   className,
+  action,
   children,
 }: {
   label: string;
   icon: typeof StickyNote;
   className?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className={cn("rounded-2xl border border-amber-100 bg-amber-50/60 p-4", className)}>
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-muted">
-        <Icon className="size-3.5" /> {label}
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-muted">
+          <Icon className="size-3.5" /> {label}
+        </p>
+        {action}
+      </div>
       <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-foreground">{children}</p>
     </div>
   );
