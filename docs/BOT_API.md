@@ -12,8 +12,7 @@ The bot only sends what the customer said or chose. The WhatsApp BOT API applies
 
 - it finds the customer by WhatsApp number, so there are no duplicates;
 - it works out each booking's end time;
-- it keeps bookings inside opening hours and away from other bookings and blocked time;
-- it moves the customer's stage.
+- it keeps bookings inside opening hours and away from other bookings and blocked time.
 
 Each new booking appears on the clinic's screens the moment it is made.
 
@@ -128,15 +127,15 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "data": { "customerId": 1052, "action": "created", "customerName": "Sarah Fernando", "stage": "Interested" },
+  "data": { "customerId": 1052, "action": "created", "customerName": "Sarah Fernando" },
   "message": "Sarah Fernando was added."
 }
 ```
 
 What the API does:
 
-- **New number:** creates the customer at stage **Interested**, with lead source **WhatsApp BOT**.
-- **Known number:** returns `action: "updated"` with the same `customerId`. The customer's name, stage and source don't change.
+- **New number:** creates the customer, with lead source **WhatsApp BOT**.
+- **Known number:** returns `action: "updated"` with the same `customerId`. The customer's name and source don't change.
 
 ## 5. Treatments: `GET /treatments`
 
@@ -199,7 +198,7 @@ Rules on the date:
 
 ## 7. Book a consultation: `POST /bookings`
 
-Books a consultation for a customer saved in section 4, found by WhatsApp number. The customer's stage moves to **Booked**.
+Books a consultation for a customer saved in section 4, found by WhatsApp number.
 
 ```http
 POST /api/bot/bookings

@@ -297,4 +297,53 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
             new CompleteBookingRequest(0, "Waived", null, null, null, null))).StatusCode);
     }
+
+    // ---- Stage automation on cancel, no-show and a lost customer's return ----------------------
+
+    private static async Task<string?> StageAsync(HttpClient admin, int customerId) =>
+        (await DataAsync<CustomerDetailDto>(await admin.GetAsync($"/api/customers/{customerId}"))).Stage.SystemKey;
+
+    [Fact]
+    public async Task Cancelling_the_only_booking_moves_the_customer_to_follow_up()
+    {
+        var admin = await AdminAsync();
+        var (customer, treatments) = await NewCustomerAsync(admin);
+        var day = NewDay();
+        var first = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings", Book(customer.Id, day, T(9), T(9, 30), [treatments[0].Id])));
+        var second = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings", Book(customer.Id, day.AddDays(7), T(9), T(9, 30), [treatments[0].Id])));
+        var reason = (await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/cancellation-reasons")))[0].Id;
+
+        // Another consultation is still booked: the stage stays Booked.
+        await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{first.Id}/cancel", new CancelBookingRequest(reason, null)));
+        Assert.Equal("booked", await StageAsync(admin, customer.Id));
+
+        await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{second.Id}/cancel", new CancelBookingRequest(reason, null)));
+        Assert.Equal("follow_up", await StageAsync(admin, customer.Id));
+    }
+
+    [Fact]
+    public async Task A_no_show_with_nothing_else_booked_moves_the_customer_to_follow_up()
+    {
+        var admin = await AdminAsync();
+        var (customer, treatments) = await NewCustomerAsync(admin);
+        var past = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings",
+            Book(customer.Id, new DateOnly(2024, 4, 1).AddDays(Interlocked.Increment(ref _seq) % 300), T(8), T(8, 30), [treatments[0].Id])));
+        await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{past.Id}/no-show", new { }));
+        Assert.Equal("follow_up", await StageAsync(admin, customer.Id));
+    }
+
+    [Fact]
+    public async Task A_lost_customer_who_books_again_is_booked()
+    {
+        var admin = await AdminAsync();
+        var (customer, treatments) = await NewCustomerAsync(admin);
+        var stages = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/stages"));
+        var lost = stages.Single(x => x.SystemKey == "lost").Id;
+        (await admin.PutAsJsonAsync($"/api/customers/{customer.Id}", new SaveCustomerRequest(customer.Name, customer.WhatsApp, null, null, null,
+            lost, null, null, [treatments[0].Id], null, null, null, null))).EnsureSuccessStatusCode();
+        Assert.Equal("lost", await StageAsync(admin, customer.Id));
+
+        await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings", Book(customer.Id, NewDay(), T(11), T(11, 30), [treatments[0].Id])));
+        Assert.Equal("booked", await StageAsync(admin, customer.Id));
+    }
 }

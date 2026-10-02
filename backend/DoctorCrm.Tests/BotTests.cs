@@ -100,7 +100,6 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var first = await DataAsync<BotLeadResultDto>(await bot.PostAsJsonAsync("/api/bot/customers",
             new BotLeadRequest("Sarah Bot", number, [t[0]], "Asked about prices")));
         Assert.Equal("created", first.Action);
-        Assert.Equal("Interested", first.Stage);
 
         // Same number written differently: the same customer, the treatment added, the name kept.
         var spaced = number[..4] + " " + number[4..6] + " " + number[6..];
@@ -113,6 +112,7 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var customer = await DataAsync<JsonElement>(await admin.GetAsync($"/api/customers/{first.CustomerId}"));
         Assert.Equal(BotService.SourceName, customer.GetProperty("leadSource").GetProperty("name").GetString());
         Assert.Equal(2, customer.GetProperty("treatments").GetArrayLength());
+        Assert.Equal("interested", customer.GetProperty("stage").GetProperty("systemKey").GetString());
     }
 
     [Fact]

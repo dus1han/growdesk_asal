@@ -74,8 +74,7 @@ public class BotService(
 
         var (customer, action) = await UpsertCustomerAsync(name, number, treatmentIds, notes, client, ct);
         await SaveAsync(ct);
-        var stage = await db.Stages.AsNoTracking().Where(s => s.Id == customer.StageId).Select(s => s.Name).SingleAsync(ct);
-        return new BotLeadResultDto(customer.Id, action, customer.Name, stage);
+        return new BotLeadResultDto(customer.Id, action, customer.Name);
     }
 
     // ---- Bookings ------------------------------------------------------------------------------------

@@ -21,7 +21,7 @@ public record BotAvailabilityDto(string Date, bool Open, string? OpensAt, string
 public record BotLeadRequest(string? Name, string? WhatsApp, IReadOnlyList<int>? TreatmentIds, string? Notes);
 
 /// <summary><c>Action</c> is "created" or "updated" (the WhatsApp number was already known).</summary>
-public record BotLeadResultDto(int CustomerId, string Action, string CustomerName, string Stage);
+public record BotLeadResultDto(int CustomerId, string Action, string CustomerName);
 
 /// <summary>Books a consultation for a customer already saved with POST /customers (found by WhatsApp number).</summary>
 public record BotBookingRequest(string? WhatsApp, IReadOnlyList<int>? TreatmentIds, string? Date, string? StartTime, string? Notes);
