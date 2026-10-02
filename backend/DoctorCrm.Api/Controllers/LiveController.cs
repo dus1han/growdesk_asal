@@ -53,6 +53,13 @@ public class LiveController(LiveEvents live, AppDbContext db, IHostApplicationLi
                 foreach (var e in missed) await SendAsync(e, ct);
                 lastId = missed.Count > 0 ? missed[^1].BookingId : since;
             }
+            else
+            {
+                lastId = await db.Bookings.Where(b => b.Source == BotService.SourceName).MaxAsync(b => (int?)b.Id, ct) ?? 0;
+            }
+            // Gives even a brand-new screen an ID to resume from, so a dropped connection catches up
+            // on bookings made while it was reconnecting.
+            await WriteAsync($"id: {lastId}\nevent: ready\ndata: {{}}\n\n", ct);
 
             while (!ct.IsCancellationRequested)
             {

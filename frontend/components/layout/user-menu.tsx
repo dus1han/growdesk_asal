@@ -2,11 +2,12 @@
 
 import * as Popover from "@radix-ui/react-popover";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronsUpDown, KeyRound, LogOut, PlayCircle } from "lucide-react";
+import { BellRing, ChevronsUpDown, KeyRound, LogOut, PlayCircle, Volume2, VolumeX } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChangePasswordDrawer } from "@/components/auth/change-password-drawer";
 import { useLogout } from "@/lib/auth/session";
+import { desktopAlertPermission, playChime, requestDesktopAlerts, setSoundEnabled, soundEnabled } from "@/lib/live-alerts";
 import { cn, initials } from "@/lib/utils";
 import type { CurrentUser } from "@/types/api";
 
@@ -17,6 +18,15 @@ export function UserMenu({ user, collapsed }: { user: CurrentUser; collapsed: bo
   const [open, setOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const [sound, setSound] = useState(true);
+  const [alerts, setAlerts] = useState<NotificationPermission | "unsupported">("unsupported");
+
+  // Browser-only settings: read after mount.
+  useEffect(() => {
+    if (!open) return;
+    setSound(soundEnabled()); // eslint-disable-line react-hooks/set-state-in-effect -- read on open from localStorage
+    setAlerts(desktopAlertPermission());
+  }, [open]);
 
   // Arrow keys move between items, like a native menu.
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -104,6 +114,35 @@ export function UserMenu({ user, collapsed }: { user: CurrentUser; collapsed: bo
                       <PlayCircle className="size-4 text-muted" />
                       GrowDesk Capture
                     </button>
+                    <div className="mx-2 my-1 h-px bg-line" role="separator" />
+                    <button
+                      role="menuitemcheckbox"
+                      aria-checked={sound}
+                      onClick={() => {
+                        setSoundEnabled(!sound);
+                        setSound(!sound);
+                        if (!sound) playChime();
+                      }}
+                      className={cn(item, "text-foreground hover:bg-surface-muted focus-visible:bg-surface-muted")}
+                    >
+                      {sound ? <Volume2 className="size-4 text-muted" /> : <VolumeX className="size-4 text-muted" />}
+                      <span className="flex-1 text-left">Booking sound</span>
+                      <span className={cn("text-xs font-semibold", sound ? "text-brand" : "text-muted")}>{sound ? "On" : "Off"}</span>
+                    </button>
+                    {alerts !== "unsupported" && (
+                      <button
+                        role="menuitem"
+                        disabled={alerts !== "default"}
+                        onClick={() => void requestDesktopAlerts().then(setAlerts)}
+                        className={cn(item, "text-foreground hover:bg-surface-muted focus-visible:bg-surface-muted disabled:hover:bg-transparent")}
+                      >
+                        <BellRing className="size-4 text-muted" />
+                        <span className="flex-1 text-left">Desktop alerts</span>
+                        <span className={cn("text-xs font-semibold", alerts === "granted" ? "text-brand" : "text-muted")}>
+                          {alerts === "granted" ? "On" : alerts === "denied" ? "Blocked" : "Turn on"}
+                        </span>
+                      </button>
+                    )}
                     <div className="mx-2 my-1 h-px bg-line" role="separator" />
                     <button
                       role="menuitem"

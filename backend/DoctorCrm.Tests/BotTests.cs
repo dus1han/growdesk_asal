@@ -333,15 +333,19 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
             new BotBookingRequest(await SavedAsync(bot, "Live Bot", [t[0]]), [t[0]], Day(), "12:00", null)));
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        // Skip the "ready" message every connection starts with; collect the booking event.
         var lines = new List<string>();
-        while (!lines.Any(l => l.StartsWith("data:")))
+        var sawBooking = false;
+        while (!(sawBooking && lines[^1].StartsWith("data:")))
         {
             var line = await reader.ReadLineAsync(timeout.Token);
-            if (!string.IsNullOrEmpty(line)) lines.Add(line);
+            if (string.IsNullOrEmpty(line)) continue;
+            if (line == "event: booking.created") sawBooking = true;
+            if (sawBooking || line.StartsWith("id:")) lines.Add(line);
         }
         Assert.Contains($"id: {result.Booking.BookingId}", lines);
         Assert.Contains("event: booking.created", lines);
-        var data = JsonDocument.Parse(lines.Single(l => l.StartsWith("data:"))["data:".Length..]).RootElement;
+        var data = JsonDocument.Parse(lines.Last(l => l.StartsWith("data:"))["data:".Length..]).RootElement;
         Assert.Equal("Live Bot", data.GetProperty("customerName").GetString());
         Assert.True(data.GetProperty("newCustomer").GetBoolean());
 

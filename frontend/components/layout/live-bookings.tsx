@@ -3,9 +3,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Bot, CalendarClock, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BookingDetailsDrawer } from "@/components/bookings/booking-details-drawer";
 import { formatTime } from "@/components/bookings/booking-status";
+import { playChime, showDesktopAlert, unlockSound } from "@/lib/live-alerts";
 import { cn } from "@/lib/utils";
 
 /** A booking the WhatsApp BOT just made, moved or cancelled (backend LiveBookingEventDto). */
@@ -39,6 +40,19 @@ export function LiveBookings() {
   const qc = useQueryClient();
   const [cards, setCards] = useState<LiveBookingEvent[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
+  const visible = usePageVisible();
+  const [unseen, setUnseen] = useState(0);
+
+  // While GrowDesk is in a background tab, the tab title counts what arrived: "(2) New booking – …".
+  useEffect(() => {
+    const strip = (t: string) => t.replace(TITLE_PREFIX, "");
+    if (visible) {
+      setUnseen(0); // eslint-disable-line react-hooks/set-state-in-effect -- seen once the tab is shown
+      document.title = strip(document.title);
+    } else if (unseen > 0) {
+      document.title = `(${unseen}) New booking – ${strip(document.title)}`;
+    }
+  }, [visible, unseen]);
 
   useEffect(() => {
     let source: EventSource | null = null;
@@ -57,14 +71,25 @@ export function LiveBookings() {
       void qc.invalidateQueries({ queryKey: ["bookings"] });
       void qc.invalidateQueries({ queryKey: ["customers"] });
       void qc.invalidateQueries({ queryKey: ["dashboard"] });
-      if (evt.type !== "booking.updated")
+      if (evt.type !== "booking.updated") {
         setCards((c) => [evt, ...c.filter((x) => x.bookingId !== evt.bookingId)].slice(0, MAX_CARDS));
+        if (document.visibilityState !== "visible") setUnseen((n) => n + 1);
+        playChime();
+        const what = evt.type === "booking.cancelled" ? "Booking cancelled" : evt.type === "booking.rescheduled" ? "Booking moved" : "New booking";
+        showDesktopAlert(`${what} · ${evt.source}`, `${evt.customerName} · ${evt.date} ${evt.startTime.slice(0, 5)}`, () =>
+          setOpenId(evt.bookingId),
+        );
+      }
     };
 
     const connect = () => {
       // The browser resends the last event ID on its own reconnects; a fresh EventSource needs it in the URL.
       source = new EventSource(lastId ? `/api/live/stream?lastEventId=${encodeURIComponent(lastId)}` : "/api/live/stream");
       for (const type of EVENT_TYPES) source.addEventListener(type, onEvent as EventListener);
+      // Sent on connect: the latest booking ID, so a reconnect catches up on what it missed.
+      source.addEventListener("ready", ((e: MessageEvent<string>) => {
+        if (e.lastEventId) lastId = e.lastEventId;
+      }) as EventListener);
       source.onerror = () => {
         // Still CONNECTING means the browser is retrying by itself; CLOSED means it gave up.
         if (stopped || source?.readyState !== EventSource.CLOSED) return;
@@ -73,10 +98,13 @@ export function LiveBookings() {
     };
 
     connect();
+    // Sound can only play after a click in the page; prepare it on the first one.
+    window.addEventListener("pointerdown", unlockSound, { once: true });
     return () => {
       stopped = true;
       clearTimeout(retry);
       source?.close();
+      window.removeEventListener("pointerdown", unlockSound);
     };
   }, [qc]);
 
@@ -119,6 +147,20 @@ function shortDate(iso: string) {
   });
 }
 
+const TITLE_PREFIX = /^\(\d+\) New booking – /;
+
+/** True while this browser tab is the one being shown. */
+function usePageVisible() {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const update = () => setVisible(document.visibilityState === "visible");
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+  return visible;
+}
+
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -130,13 +172,19 @@ const initials = (name: string) =>
 function LiveBookingCard({ booking, onClose, onOpen }: { booking: LiveBookingEvent; onClose: () => void; onOpen: () => void }) {
   const reduced = useReducedMotion();
   const [hovered, setHovered] = useState(false);
-
-  // Slides away by itself; hovering keeps it open.
+  const visible = usePageVisible();
+  const close = useRef(onClose);
   useEffect(() => {
-    if (hovered) return;
-    const t = setTimeout(onClose, SHOW_MS);
+    close.current = onClose;
+  }, [onClose]);
+
+  // Slides away by itself once it has been on screen for a while: never while GrowDesk is in a
+  // background tab (it waits until someone looks), and not while hovered.
+  useEffect(() => {
+    if (hovered || !visible) return;
+    const t = setTimeout(() => close.current(), SHOW_MS);
     return () => clearTimeout(t);
-  }, [hovered, onClose]);
+  }, [hovered, visible]);
 
   const moved = booking.type === "booking.rescheduled";
   const cancelled = booking.type === "booking.cancelled";
