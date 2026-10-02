@@ -224,31 +224,21 @@ public class CaptureTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task A_booked_customer_is_not_moved_back_to_a_lead_stage()
+    public async Task The_status_picked_in_the_toolbar_is_applied_as_chosen()
     {
         var admin = await AdminAsync();
         await SetCaptureFieldsAsync(admin, Defaults);
         var (_, tool) = await ConnectAsync(admin);
         var stages = await DataAsync<List<CaptureLookupDto>>(await tool.GetAsync("/api/capture/stages"));
-        var treatments = await DataAsync<List<CaptureLookupDto>>(await tool.GetAsync("/api/capture/treatments"));
+        Assert.Equal(["Interested", "Follow-up", "Customer", "Lost"], stages.Select(s => s.Name).Take(4));
         var number = Number();
 
-        var lead = await DataAsync<CaptureCustomerResultDto>(await tool.PostAsJsonAsync("/api/capture/customers", Lead("Booked Bina", number)));
-        await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings",
-            new CreateBookingRequest(lead.CustomerId, null, new DateOnly(2027, 1, 5), new TimeOnly(10, 0), new TimeOnly(10, 30), [treatments[0].Id], null)));
-
+        var lead = await DataAsync<CaptureCustomerResultDto>(await tool.PostAsJsonAsync("/api/capture/customers", Lead("Status Sana", number)));
         var result = await DataAsync<CaptureCustomerResultDto>(await tool.PostAsJsonAsync("/api/capture/customers",
-            Lead("Booked Bina", number, stageId: stages.Single(s => s.Name == "Interested").Id)));
-        Assert.Contains(result.Warnings, w => w.StartsWith("Stage stays Booked"));
+            Lead("Status Sana", number, stageId: stages.Single(s => s.Name == "Lost").Id)));
+        Assert.Empty(result.Warnings);
         var customer = await DataAsync<CustomerDetailDto>(await admin.GetAsync($"/api/customers/{lead.CustomerId}"));
-        Assert.Equal("booked", customer.Stage.SystemKey);
-
-        // A lead can still move between the lead stages.
-        var other = await DataAsync<CaptureCustomerResultDto>(await tool.PostAsJsonAsync("/api/capture/customers", Lead("Fresh Farah", Number())));
-        var moved = await DataAsync<CaptureCustomerResultDto>(await tool.PostAsJsonAsync("/api/capture/customers",
-            Lead("Fresh Farah", (await DataAsync<CustomerDetailDto>(await admin.GetAsync($"/api/customers/{other.CustomerId}"))).WhatsApp,
-                stageId: stages.Single(s => s.Name == "Follow-up").Id)));
-        Assert.Empty(moved.Warnings);
+        Assert.Equal("lost", customer.Stage.SystemKey);
     }
 
     [Fact]

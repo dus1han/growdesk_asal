@@ -7,9 +7,9 @@ export default function Page() {
   return (
     <LookupManager
       resource="stages"
-      title="Stages"
-      description="Where each customer is in their journey. Stages marked Automation are moved automatically."
-      singular="stage"
+      title="Statuses"
+      description="The clinic's own view of each customer, set by staff. Completing a consultation makes the person a Customer. Where they are with consultations is shown separately, from their bookings."
+      singular="status"
       icon={Layers}
       withColor
     />

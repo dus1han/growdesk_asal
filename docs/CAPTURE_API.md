@@ -3,8 +3,8 @@
 **Written for: whoever builds or maintains the CRM Capture toolbar (or any other capture tool).**
 
 The capture tool never touches the database. It talks to these endpoints over HTTPS, and the
-CRM decides everything: which fields are required, how numbers are normalised, whether a lead
-is a new customer or an existing one, and what stage they are in.
+CRM decides everything: which fields are required, how numbers are normalised, and whether a lead
+is a new customer or an existing one.
 
 All responses use the CRM's standard envelope:
 
@@ -74,7 +74,7 @@ Lists for the built-in choice fields:
 | Endpoint | Returns | Used by field |
 | --- | --- | --- |
 | `GET /api/capture/treatments` | `[{ "id": 1, "name": "Botox", "color": null }]` | `treatments` |
-| `GET /api/capture/stages` | `[{ "id": 1, "name": "Interested", "color": "#6366F1" }]` | `stage` |
+| `GET /api/capture/stages` | `[{ "id": 1, "name": "Interested", "color": "#6366F1" }]` (the customer statuses) | `stage` (shown as Status) |
 | `GET /api/capture/sources` | `[{ "id": 2, "name": "Instagram", "color": null }]` | `lead_source` |
 | `GET /api/capture/custom-fields` | `[{ "key": "preferred_clinic", "label": "Preferred Clinic", "type": "dropdown", "options": [...] }]` | custom fields |
 
@@ -118,7 +118,7 @@ Existing customer:
     "customerId": 1052,
     "action": "updated",
     "customerName": "Sarah Fernando",
-    "warnings": ["Stage stays Booked: Sarah Fernando is further along than Interested."]
+    "warnings": ["Instagram @sarah.f belongs to Sarah Perera, so it was not added."]
   },
   "message": "Sarah Fernando was updated."
 }
@@ -136,15 +136,14 @@ Show `message` to the user, and any `warnings` underneath it.
    At least a WhatsApp number or an Instagram name is needed to identify the customer.
 4. **The customer is found by WhatsApp number, then Instagram name.** The same number in a
    different format is the same customer.
-5. **New customers** start in the stage sent, or **Interested**.
+5. **New customers** start with the status sent, or **Interested**.
 6. **Existing customers are only added to**, never cleared:
    - Treatments are added to their interests.
    - Notes are appended.
    - A new Instagram name is added unless it belongs to someone else (a warning says so).
    - A different WhatsApp number never replaces the one on record. It becomes the secondary
      number if that is free, with a warning.
-   - The stage changes only while the customer is still a lead (Interested or Follow-up). A
-     booked or seen customer keeps their stage, with a warning.
+   - A status sent is applied as chosen: the status is the clinic's own judgement, set by people.
 7. **Last contact** is set to today, and the customer's activity shows *Captured on <connection name>*.
 
 ### Field reference
@@ -157,7 +156,7 @@ Show `message` to the user, and any `warnings` underneath it.
 | `instagram` | `instagram` | text |
 | `email` | `email` | email |
 | `treatments` | `treatmentIds` | array of treatment ids |
-| `stage` | `stageId` | stage id |
+| `stage` | `stageId` | status id (from `GET /api/capture/stages`) |
 | `lead_source` | `leadSourceId` | lead source id |
 | `notes` | `notes` | text (≤4000) |
 | custom field | `customFields["<key>"]` | text / number / `yyyy-MM-dd` / option id / array of option ids / boolean, by type |

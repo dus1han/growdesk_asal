@@ -134,7 +134,7 @@ export function LookupManager({ resource, title, description, singular, icon, wi
                     <p className={cn("truncate text-sm font-medium", !item.isActive && "text-muted")}>{item.name}</p>
                     {item.systemKey && (
                       <Badge tone="brand">
-                        <Lock className="size-3" /> Automation
+                        <Lock className="size-3" /> Built-in
                       </Badge>
                     )}
                     {!item.isActive && <Badge tone="muted">Inactive</Badge>}
@@ -150,7 +150,7 @@ export function LookupManager({ resource, title, description, singular, icon, wi
                   <Pencil className="size-4" />
                 </button>
                 <span
-                  title={item.systemKey ? "Used by stage automation, so it can't be deactivated." : undefined}
+                  title={item.systemKey ? "Built in, so it can't be deactivated. You can rename it." : undefined}
                   className="flex shrink-0 items-center"
                 >
                   <Switch
@@ -250,7 +250,7 @@ function LookupDrawer({
       open={item !== null}
       onOpenChange={(open) => !open && onClose()}
       title={existing ? `Edit ${singular}` : `Add ${singular}`}
-      description={existing?.systemKey ? "This stage is used by automation. You can rename it and change its colour." : undefined}
+      description={existing?.systemKey ? "A built-in status. You can rename it and change its colour." : undefined}
       footer={
         <>
           <Button type="button" variant="secondary" onClick={onClose}>
@@ -274,7 +274,7 @@ function LookupDrawer({
         )}
 
         {withColor && (
-          <Field label="Colour" required hint="Used for this stage's badges everywhere in the app." error={errors.color?.message}>
+          <Field label="Colour" required hint="Used for this status's badges everywhere in the app." error={errors.color?.message}>
             {(p) => (
               <div>
                 <div className="grid grid-cols-6 gap-2" role="radiogroup" aria-label="Colour presets">
@@ -311,7 +311,7 @@ function LookupDrawer({
                       style={{ backgroundColor: `${color}1A`, color }}
                     >
                       <span className="size-1.5 rounded-full" style={{ backgroundColor: color }} />
-                      {name || "Stage name"}
+                      {name || "Status name"}
                     </span>
                   </div>
                 )}

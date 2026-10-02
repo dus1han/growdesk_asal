@@ -1,12 +1,17 @@
 namespace DoctorCrm.Api.Entities;
 
+/// <summary>
+/// A customer's status (shown as "Status"; called a stage in code and the database): the clinic's
+/// own judgement, set by staff. Where a customer is with consultations is not a status: it is
+/// worked out from their bookings (see ConsultationDto).
+/// </summary>
 public class Stage : AuditableEntity, ILookupEntity, IHasColor
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Fixed key used by stage automation (e.g. "interested", "booked"). Admins can rename
+    /// Fixed key the app relies on (e.g. "interested", "customer"). Admins can rename
     /// <see cref="Name"/> freely; automation always looks stages up by this key. Null for
     /// stages added by admins, which automation never targets.
     /// </summary>
@@ -21,11 +26,10 @@ public class Stage : AuditableEntity, ILookupEntity, IHasColor
 
 public static class StageKeys
 {
+    /// <summary>Where new leads start (capture toolbar, WhatsApp BOT, a new customer without a status).</summary>
     public const string Interested = "interested";
     public const string FollowUp = "follow_up";
-    public const string Booked = "booked";
-    public const string ConsultationCompleted = "consultation_completed";
-    public const string TreatmentStarted = "treatment_started";
-    public const string Completed = "completed";
+    /// <summary>Set automatically when a consultation is completed, the only automatic status change.</summary>
+    public const string Customer = "customer";
     public const string Lost = "lost";
 }

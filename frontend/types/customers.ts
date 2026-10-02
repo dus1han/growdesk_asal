@@ -19,12 +19,24 @@ export interface Paged<T> {
   totalCount: number;
 }
 
+export type ConsultationState = "booked" | "consulted" | "missed" | "none";
+
+/** Where the customer is with consultations, worked out from their bookings (backend ConsultationDto). */
+export interface Consultation {
+  state: ConsultationState;
+  bookingId: number | null;
+  date: string | null;
+  startTime: string | null;
+  nextTreatmentDate: string | null;
+}
+
 export interface CustomerListItem {
   id: number;
   name: string;
   whatsApp: string | null;
   instagram: string | null;
   stage: StageRef;
+  consultation: Consultation;
   treatments: NamedRef[];
   leadSource: string | null;
   assignedUser: string | null;
@@ -53,6 +65,7 @@ export interface CustomerDetail {
   instagram: string | null;
   email: string | null;
   stage: StageRef;
+  consultation: Consultation;
   leadSource: NamedRef | null;
   assignedUser: NamedRef | null;
   lastContactDate: string | null;
@@ -98,6 +111,7 @@ export interface DuplicateCustomer {
 export interface CustomerFilters {
   search?: string;
   stageId?: number;
+  consultation?: ConsultationState;
   treatmentId?: number;
   leadSourceId?: number;
   assignedUserId?: number;

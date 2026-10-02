@@ -119,7 +119,7 @@ export function StageSummary({ stages, loading }: { stages: DashboardStage[] | u
   const max = Math.max(1, ...(stages?.map((s) => s.count) ?? [0]));
   return (
     <Card>
-      <CardHeader title="Potential Customers" description={total > 0 ? `${total.toLocaleString()} customers by stage` : "Customers by stage"} />
+      <CardHeader title="Potential Customers" description={total > 0 ? `${total.toLocaleString()} customers by status` : "Customers by status"} />
       {loading ? (
         <div className="space-y-4 p-5" aria-busy="true" aria-label="Loading">
           {Array.from({ length: 5 }, (_, i) => (
@@ -127,7 +127,7 @@ export function StageSummary({ stages, loading }: { stages: DashboardStage[] | u
           ))}
         </div>
       ) : !stages || total === 0 ? (
-        <EmptyState icon={ListChecks} title="No customers yet" description="Once customers are captured, you'll see how many sit in each stage." />
+        <EmptyState icon={ListChecks} title="No customers yet" description="Once customers are captured, you'll see how many have each status." />
       ) : (
         <ul className="space-y-1 p-3">
           {stages.map((s, i) => (

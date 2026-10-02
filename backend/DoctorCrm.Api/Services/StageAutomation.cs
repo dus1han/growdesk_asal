@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 namespace DoctorCrm.Api.Services;
 
 /// <summary>
-/// The CRM owns stage automation (spec §18). Stages are found by their fixed system key, so
-/// admins can rename them without breaking this.
+/// The one automatic status change: completing a consultation makes the person a Customer.
+/// Statuses are found by their fixed system key, so admins can rename them without breaking this.
 /// </summary>
 public class StageAutomation(AppDbContext db, AuditService audit)
 {

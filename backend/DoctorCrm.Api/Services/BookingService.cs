@@ -140,9 +140,6 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
         foreach (var id in treatmentIds) booking.Treatments.Add(new BookingTreatment { TreatmentId = id });
         db.Bookings.Add(booking);
 
-        // Stage automation: Interested / Follow-up / Lost → Booked (a lost customer who books is back).
-        await stages.MoveAsync(customer, [StageKeys.Interested, StageKeys.FollowUp, StageKeys.Lost], StageKeys.Booked, userId, "Consultation booked", ct);
-
         await db.SaveChangesAsync(ct);
         audit.Record(userId, "Booking Created", nameof(Booking), booking.Id,
             new { customerId = customer.Id, date = r.Date, start = r.StartTime, source });
@@ -212,8 +209,8 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
             CreatedAt = now,
         });
 
-        // Stage automation: Booked → Consultation Completed.
-        await stages.MoveAsync(booking.Customer, [StageKeys.Booked], StageKeys.ConsultationCompleted, userId, "Consultation completed", ct);
+        // The one automatic status change: Interested / Follow-up / Lost → Customer.
+        await stages.MoveAsync(booking.Customer, [StageKeys.Interested, StageKeys.FollowUp, StageKeys.Lost], StageKeys.Customer, userId, "Consultation completed", ct);
 
         audit.Record(userId, "Consultation Completed", nameof(Booking), id,
             new { charge = r.ConsultationCharge, payment = status.ToString(), nextTreatment = r.NextTreatmentDate });
@@ -272,7 +269,6 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
         booking.CancellationNote = Clean(r.Note);
 
         audit.Record(userId, "Booking Cancelled", nameof(Booking), id, new { reason = reason.Name });
-        await BackToFollowUpAsync(booking, userId, "Consultation cancelled", ct);
         await db.SaveChangesAsync(ct);
         return await GetAsync(id, ct);
     }
@@ -286,20 +282,8 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
         booking.Status = BookingStatus.NoShow;
         booking.NoShowAt = DateTime.UtcNow;
         audit.Record(userId, "No Show", nameof(Booking), id);
-        await BackToFollowUpAsync(booking, userId, "No-show", ct);
         await db.SaveChangesAsync(ct);
         return await GetAsync(id, ct);
-    }
-
-    /// <summary>
-    /// Stage automation after a cancellation or no-show: Booked → Follow-up, so the clinic contacts
-    /// them, unless the customer still has another booked consultation.
-    /// </summary>
-    private async Task BackToFollowUpAsync(Booking booking, int? userId, string reason, CancellationToken ct)
-    {
-        var stillBooked = await db.Bookings.AnyAsync(b => b.CustomerId == booking.CustomerId && b.Id != booking.Id && b.Status == BookingStatus.Booked, ct);
-        if (!stillBooked)
-            await stages.MoveAsync(booking.Customer, [StageKeys.Booked], StageKeys.FollowUp, userId, reason, ct);
     }
 
     /// <summary>The single gate for status changes: only Booked consultations can move.</summary>

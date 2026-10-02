@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, CalendarClock, Check, CircleCheck, Pencil, Stethoscope, UserX, XCircle } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, CircleCheck, Pencil, Stethoscope, StickyNote, UserX, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -170,6 +170,12 @@ function Details({
         </div>
       </div>
 
+      {booking.notes && (
+        <NoteCard label="Consultation notes" icon={StickyNote}>
+          {booking.notes}
+        </NoteCard>
+      )}
+
       {(booking.rescheduledFrom || booking.rescheduledTo) && (
         <div className="space-y-2">
           {booking.rescheduledFrom && (
@@ -179,7 +185,6 @@ function Details({
         </div>
       )}
 
-      {booking.notes && <Info label="Notes">{booking.notes}</Info>}
 
       {booking.status === "Completed" && (
         <div className="space-y-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
@@ -212,7 +217,11 @@ function Details({
               <span className="font-semibold">{formatDate(booking.nextTreatmentDate)}</span>
             </p>
           )}
-          {booking.doctorNotes && <p className="whitespace-pre-line text-sm text-foreground/80">{booking.doctorNotes}</p>}
+          {booking.doctorNotes && (
+            <NoteCard label="Doctor notes" icon={Stethoscope} className="border-emerald-100 bg-surface">
+              {booking.doctorNotes}
+            </NoteCard>
+          )}
         </div>
       )}
 
@@ -319,6 +328,28 @@ function ChainLink({ label, link, onOpen }: { label: string; link: BookingDetail
   );
 }
 
+/** A note people need to read before or after the consultation, set apart from the rest. */
+function NoteCard({
+  label,
+  icon: Icon,
+  className,
+  children,
+}: {
+  label: string;
+  icon: typeof StickyNote;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn("rounded-2xl border border-amber-100 bg-amber-50/60 p-4", className)}>
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-muted">
+        <Icon className="size-3.5" /> {label}
+      </p>
+      <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-foreground">{children}</p>
+    </div>
+  );
+}
+
 function Info({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -408,6 +439,11 @@ function CompleteForm({ booking, onDone }: { booking: BookingDetail; onDone: () 
           </span>
         ))}
       </div>
+      {booking.notes && (
+        <NoteCard label="Consultation notes" icon={StickyNote}>
+          {booking.notes}
+        </NoteCard>
+      )}
 
       <Field label="Consultation charge" required error={errors.consultationCharge?.message}>
         {(p) => (
@@ -517,9 +553,9 @@ function Done({ booking, onContinue }: { booking: BookingDetail; onContinue: () 
         <p className="mt-1 text-sm text-muted">
           {booking.customer.name} · {formatMoney(booking.consultationCharge, locale?.currency)} {booking.payments[0]?.status.toLowerCase()}
         </p>
-        {booking.customerStage.systemKey === "consultation_completed" && (
+        {booking.customerStage.systemKey === "customer" && (
           <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted">
-            <Stethoscope className="size-3.5" /> Moved to {booking.customerStage.name}
+            <Stethoscope className="size-3.5" /> {booking.customer.name} is now a {booking.customerStage.name}
           </p>
         )}
         <div className="mt-6">

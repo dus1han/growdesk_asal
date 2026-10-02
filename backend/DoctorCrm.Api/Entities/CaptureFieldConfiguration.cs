@@ -39,7 +39,7 @@ public static class CaptureFields
         new("secondary_phone", "Secondary Number", "phone", true, false),
         new("instagram", "Instagram", "text", true, false),
         new("treatments", "Interested Treatments", "multiselect", true, false),
-        new("stage", "Stage", "dropdown", true, false),
+        new("stage", "Status", "dropdown", true, false),
         new("lead_source", "Lead Source", "dropdown", false, false),
         new("notes", "Notes", "textarea", false, false),
         new("email", "Email", "email", false, false),

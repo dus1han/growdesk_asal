@@ -3,16 +3,18 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { CREATED_PRESETS, FOLLOW_UP_PRESETS } from "@/lib/dates";
-import type { CustomerFilters } from "@/types/customers";
+import type { ConsultationState, CustomerFilters } from "@/types/customers";
+
+const CONSULTATION_STATES: ConsultationState[] = ["booked", "consulted", "missed", "none"];
 
 /** URL parameter names: short, readable, shareable (spec §52). */
-export type FilterParam = "q" | "stage" | "treatment" | "source" | "assigned" | "created" | "followup" | "page";
+export type FilterParam = "q" | "stage" | "consultation" | "treatment" | "source" | "assigned" | "created" | "followup" | "page";
 
 const num = (v: string | null) => (v && /^\d+$/.test(v) ? Number(v) : undefined);
 
 /**
  * Customer list filters live in the URL, so a filtered view can be bookmarked or shared
- * (e.g. /customers?stage=1&treatment=2). Changing any filter resets to page 1.
+ * (e.g. /customers?stage=1&consultation=missed). `stage` is the Status filter (its URL name is kept so old links work). Changing any filter resets to page 1.
  */
 export function useCustomerFilters() {
   const params = useSearchParams();
@@ -23,6 +25,7 @@ export function useCustomerFilters() {
     () => ({
       q: params.get("q") ?? "",
       stage: params.get("stage") ?? undefined,
+      consultation: params.get("consultation") ?? undefined,
       treatment: params.get("treatment") ?? undefined,
       source: params.get("source") ?? undefined,
       assigned: params.get("assigned") ?? undefined,
@@ -39,6 +42,7 @@ export function useCustomerFilters() {
     return {
       search: values.q.trim() || undefined,
       stageId: num(values.stage ?? null),
+      consultation: CONSULTATION_STATES.find((s) => s === values.consultation),
       treatmentId: num(values.treatment ?? null),
       leadSourceId: num(values.source ?? null),
       assignedUserId: num(values.assigned ?? null),
@@ -64,7 +68,7 @@ export function useCustomerFilters() {
 
   const clearAll = useCallback(() => router.replace(pathname, { scroll: false }), [pathname, router]);
 
-  const activeCount = ["stage", "treatment", "source", "assigned", "created", "followup"].filter(
+  const activeCount = ["stage", "consultation", "treatment", "source", "assigned", "created", "followup"].filter(
     (k) => values[k as keyof typeof values] !== undefined,
   ).length;
 

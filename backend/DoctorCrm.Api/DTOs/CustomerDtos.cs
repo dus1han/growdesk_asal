@@ -8,11 +8,30 @@ public record NamedRef(int Id, string Name);
 
 public record StageRef(int Id, string Name, string Color, string? SystemKey);
 
+/// <summary>
+/// Where the customer is with consultations, worked out from their bookings every time (never
+/// stored, so it can't go stale or be set wrongly). <c>State</c>: "booked" (a consultation is
+/// booked: the earliest one), "consulted" (the last one was completed), "missed" (the last one was
+/// cancelled or a no-show, and nothing is booked) or "none" (never booked). The booking fields
+/// describe that consultation; <c>NextTreatmentDate</c> is set on a completed one.
+/// </summary>
+public record ConsultationDto(string State, int? BookingId, DateOnly? Date, TimeOnly? StartTime, DateOnly? NextTreatmentDate);
+
+public static class ConsultationStates
+{
+    public const string Booked = "booked";
+    public const string Consulted = "consulted";
+    public const string Missed = "missed";
+    public const string None = "none";
+}
+
 /// <summary>Query string for GET /api/customers. Every filter is optional and they combine (AND).</summary>
 public class CustomerQuery
 {
     public string? Search { get; set; }
     public int? StageId { get; set; }
+    /// <summary>booked, consulted, missed or none (see ConsultationDto).</summary>
+    public string? Consultation { get; set; }
     public int? TreatmentId { get; set; }
     public int? LeadSourceId { get; set; }
     public int? AssignedUserId { get; set; }
@@ -30,6 +49,7 @@ public record CustomerListItemDto(
     string? WhatsApp,
     string? Instagram,
     StageRef Stage,
+    ConsultationDto Consultation,
     IReadOnlyList<NamedRef> Treatments,
     string? LeadSource,
     string? AssignedUser,
@@ -53,6 +73,7 @@ public record CustomerDetailDto(
     string? Instagram,
     string? Email,
     StageRef Stage,
+    ConsultationDto Consultation,
     NamedRef? LeadSource,
     NamedRef? AssignedUser,
     DateOnly? LastContactDate,

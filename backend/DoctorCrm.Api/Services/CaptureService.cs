@@ -154,18 +154,13 @@ public partial class CaptureService(AppDbContext db, AuditService audit, Contact
             changed.Add(nameof(Customer.Notes));
         }
 
-        // Stage automation belongs to the CRM (spec §18): a capture can move a lead between the
-        // lead stages, but never pulls back a customer who has been booked or seen.
+        // Status is the clinic's own judgement: what the person capturing picked is applied as chosen.
         if (lead.StageId is { } stageId && stageId != customer.StageId)
         {
             var current = await db.Stages.AsNoTracking().SingleAsync(s => s.Id == customer.StageId, ct);
             var target = await db.Stages.AsNoTracking().SingleAsync(s => s.Id == stageId, ct);
-            if (current.SystemKey is null or StageKeys.Interested or StageKeys.FollowUp)
-            {
-                customer.StageId = stageId;
-                audit.Record(null, "Stage Changed", nameof(Customer), customer.Id, new { from = current.Name, to = target.Name, source = "capture", client = clientName });
-            }
-            else warnings.Add($"Stage stays {current.Name}: {customer.Name} is further along than {target.Name}.");
+            customer.StageId = stageId;
+            audit.Record(null, "Stage Changed", nameof(Customer), customer.Id, new { from = current.Name, to = target.Name, source = "capture", client = clientName });
         }
 
         var known = customer.Treatments.Select(t => t.TreatmentId).ToHashSet();

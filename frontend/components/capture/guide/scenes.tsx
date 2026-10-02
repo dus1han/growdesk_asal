@@ -455,15 +455,15 @@ function UpdateScene({ paused, onDone }: SceneProps) {
   const notes = [
     { icon: Search, text: "Found by WhatsApp number or Instagram name, in any format." },
     { icon: UserPlus, text: "Treatments are added and notes appended. Nothing already recorded is cleared." },
-    { icon: Check, text: "A booked or seen customer keeps their stage; the toolbar says so." },
+    { icon: Check, text: "The status you pick is applied; the rest of their record stays as it was." },
   ];
   return (
     <>
       <WhatsAppPage
         toolbar={{
           capturing: false,
-          status: `✓ ${NAME} was updated. Stage stays Booked: ${NAME} is further along than Interested.`,
-          tone: "warning",
+          status: `✓ ${NAME} was updated.`,
+          tone: "success",
         }}
       >
         <div className="absolute bottom-6 right-6 w-[380px] space-y-2">

@@ -145,7 +145,7 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Null(booking.Doctor);
         Assert.Equal(BotService.SourceName, booking.Source);
         Assert.Equal("First visit", booking.Notes);
-        Assert.Equal("booked", booking.CustomerStage.SystemKey);
+        Assert.Equal("interested", booking.CustomerStage.SystemKey); // booking never changes the status
     }
 
     [Fact]

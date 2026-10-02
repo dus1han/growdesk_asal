@@ -65,10 +65,10 @@ public class LookupService<T>(AppDbContext db, AuditService audit) where T : cla
     {
         var item = await FindAsync(id, ct);
 
-        // Stage automation looks these up by key (spec §18); switching one off would break it.
+        // The app looks built-in statuses up by key (new leads, completed consultations); switching one off would break that.
         if (!isActive && item is Stage { SystemKey: not null })
             throw new BusinessRuleException(
-                $"\"{item.Name}\" is used by stage automation and can't be deactivated. You can rename it instead.");
+                $"\"{item.Name}\" is built in and can't be deactivated. You can rename it instead.");
 
         if (item.IsActive != isActive)
         {

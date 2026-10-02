@@ -26,6 +26,7 @@ import { CustomerBookingsCard } from "@/components/customers/customer-bookings-c
 import { CustomerPaymentsCard } from "@/components/customers/customer-payments-card";
 import { whatsAppUrl } from "@/components/customers/whatsapp-link";
 import { CustomerFormDrawer } from "@/components/customers/customer-form-drawer";
+import { ConsultationBadge } from "@/components/customers/consultation-badge";
 import { StageBadge } from "@/components/customers/stage-badge";
 import { RequirePermission } from "@/components/layout/require-permission";
 import { Button } from "@/components/ui/button";
@@ -212,8 +213,9 @@ function ProfileHeader({
           </motion.span>
           <div className="min-w-0">
             <h1 className="truncate font-display text-2xl font-bold tracking-tight">{customer.name}</h1>
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               {canManage ? <StageMenu customer={customer} /> : <StageBadge name={customer.stage.name} color={customer.stage.color} />}
+              <ConsultationBadge consultation={customer.consultation} />
             </div>
           </div>
         </div>
@@ -268,7 +270,7 @@ function ContactPill({ icon: Icon, label, href, title }: { icon: LucideIcon; lab
   );
 }
 
-/** Change the stage in two clicks, straight from the profile. */
+/** Change the status in two clicks, straight from the profile. */
 function StageMenu({ customer }: { customer: CustomerDetail }) {
   const [open, setOpen] = useState(false);
   const stages = useActiveLookup("stages");
@@ -279,13 +281,13 @@ function StageMenu({ customer }: { customer: CustomerDetail }) {
     if (stageId === customer.stage.id) return;
     save.mutate(
       { id: customer.id, ...toSavePayload(customer), stageId },
-      { onSuccess: () => toast.success(`${customer.name} moved to ${name}`), onError: toastError },
+      { onSuccess: () => toast.success(`${customer.name} is now ${name}`), onError: toastError },
     );
   };
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger className="group inline-flex items-center gap-1 rounded-full focus-visible:outline-offset-2" aria-label="Change stage">
+      <Popover.Trigger className="group inline-flex items-center gap-1 rounded-full focus-visible:outline-offset-2" aria-label="Change status">
         <AnimatePresence mode="wait" initial={false}>
           <motion.span key={customer.stage.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }}>
             <StageBadge name={customer.stage.name} color={customer.stage.color} />
@@ -295,7 +297,7 @@ function StageMenu({ customer }: { customer: CustomerDetail }) {
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content align="start" sideOffset={6} className="z-50 w-56 rounded-xl border border-line bg-surface p-1 shadow-pop">
-          <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">Move to stage</p>
+          <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">Change status to</p>
           {stages.data?.map((s) => (
             <button
               key={s.id}

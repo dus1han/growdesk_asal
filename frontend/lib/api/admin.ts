@@ -58,7 +58,7 @@ export function useLookupMutations(resource: LookupResource) {
   const setActive = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
       api.patch<LookupItem>(`/${resource}/${id}/active`, { isActive }),
-    // Flip the switch immediately; roll back if the server refuses (e.g. an automation stage).
+    // Flip the switch immediately; roll back if the server refuses (e.g. a built-in status).
     onMutate: async ({ id, isActive }) => {
       await qc.cancelQueries({ queryKey: allKey });
       const previous = qc.getQueryData<LookupItem[]>(allKey);

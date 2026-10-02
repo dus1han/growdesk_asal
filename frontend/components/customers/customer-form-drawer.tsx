@@ -252,9 +252,9 @@ function CustomerForm({
       </section>
 
       <fieldset>
-        <legend className="mb-2 text-[13px] font-medium">Stage</legend>
+        <legend className="mb-2 text-[13px] font-medium">Status</legend>
         {!customer && <p className="-mt-1 mb-2 text-xs text-muted">Leave empty to start as {stages.data?.find((s) => s.systemKey === "interested")?.name ?? "Interested"}.</p>}
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Stage">
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Status">
           {stages.data?.map((s) => {
             const selected = stageId === s.id;
             const color = s.color ?? "#64748B";

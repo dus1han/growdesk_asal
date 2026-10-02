@@ -5,6 +5,7 @@ import { CircleAlert, Plus, RotateCcw, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { CustomerFormDrawer } from "@/components/customers/customer-form-drawer";
+import { CONSULTATION, ConsultationBadge } from "@/components/customers/consultation-badge";
 import { StageBadge, TreatmentChips } from "@/components/customers/stage-badge";
 import { WhatsAppLink } from "@/components/customers/whatsapp-link";
 import { PageHeader } from "@/components/layout/page-header";
@@ -20,7 +21,6 @@ import { useCustomerFilters } from "@/hooks/use-customer-filters";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { CUSTOMER_PAGE_SIZE, useActiveLookup, useCustomers, useUserOptions } from "@/lib/api/customers";
 import { useSession } from "@/lib/auth/session";
-import { formatTime } from "@/components/bookings/booking-status";
 import { CREATED_PRESETS, followUpState, FOLLOW_UP_PRESETS, formatDate } from "@/lib/dates";
 import { can, Permission } from "@/lib/permissions";
 import { cn, initials } from "@/lib/utils";
@@ -81,10 +81,16 @@ function CustomersView() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <FilterMenu
-              label="Stage"
+              label="Status"
               value={values.stage}
               onChange={(v) => set("stage", v)}
               options={stages.data?.map((s) => ({ value: String(s.id), label: s.name, color: s.color ?? undefined })) ?? []}
+            />
+            <FilterMenu
+              label="Consultation"
+              value={values.consultation}
+              onChange={(v) => set("consultation", v)}
+              options={Object.entries(CONSULTATION).map(([value, m]) => ({ value, label: m.label }))}
             />
             <FilterMenu
               label="Treatment"
@@ -191,8 +197,8 @@ function CustomerTable({ items, onOpen }: { items: CustomerListItem[]; onOpen: (
             <th className="px-4 py-3 font-semibold">Name</th>
             <th className="px-4 py-3 font-semibold">WhatsApp</th>
             <th className="px-4 py-3 font-semibold">Treatments</th>
-            <th className="px-4 py-3 font-semibold">Stage</th>
-            <th className="px-4 py-3 font-semibold">Next booking</th>
+            <th className="px-4 py-3 font-semibold">Status</th>
+            <th className="px-4 py-3 font-semibold">Consultation</th>
             <th className="px-4 py-3 font-semibold">Follow-up</th>
             <th className="px-4 py-3 font-semibold">Created</th>
           </tr>
@@ -229,15 +235,8 @@ function CustomerTable({ items, onOpen }: { items: CustomerListItem[]; onOpen: (
               <td className="px-4 py-3">
                 <StageBadge name={c.stage.name} color={c.stage.color} />
               </td>
-              <td className="whitespace-nowrap px-4 py-3">
-                {c.nextBooking ? (
-                  <span className="font-medium">
-                    {formatDate(c.nextBooking.date)}
-                    <span className="text-muted"> · {formatTime(c.nextBooking.startTime)}</span>
-                  </span>
-                ) : (
-                  <span className="text-muted">—</span>
-                )}
+              <td className="px-4 py-3">
+                <ConsultationBadge consultation={c.consultation} />
               </td>
               <td className="px-4 py-3">
                 <FollowUp date={c.nextFollowUpDate} />
@@ -281,11 +280,7 @@ function CustomerCards({ items, onOpen }: { items: CustomerListItem[]; onOpen: (
                 </p>
               )}
               <TreatmentChips treatments={c.treatments} max={3} />
-              {c.nextBooking && (
-                <p className="text-xs text-muted">
-                  Booked: <span className="font-medium text-foreground">{formatDate(c.nextBooking.date)}, {formatTime(c.nextBooking.startTime)}</span>
-                </p>
-              )}
+              <ConsultationBadge consultation={c.consultation} />
               {c.nextFollowUpDate && (
                 <p className="text-xs text-muted">
                   Follow-up: <FollowUp date={c.nextFollowUpDate} />

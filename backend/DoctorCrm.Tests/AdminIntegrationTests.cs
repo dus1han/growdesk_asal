@@ -69,15 +69,16 @@ public class AdminIntegrationTests(ApiFactory factory) : IClassFixture<ApiFactor
         var admin = await AdminAsync();
         var stages = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/stages?includeInactive=true"));
 
-        var booked = stages.Single(s => s.SystemKey == "booked");
-        var refused = await admin.PatchAsJsonAsync($"/api/stages/{booked.Id}/active", new SetActiveRequest(false));
+        var customer = stages.Single(s => s.SystemKey == "customer");
+        var refused = await admin.PatchAsJsonAsync($"/api/stages/{customer.Id}/active", new SetActiveRequest(false));
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
-        Assert.Contains("automation", await MessageAsync(refused));
+        Assert.Contains("built in", await MessageAsync(refused));
 
-        // Renaming an automation stage is fine.
-        var renamed = await DataAsync<LookupItemDto>(await admin.PutAsJsonAsync($"/api/stages/{booked.Id}",
-            new SaveLookupItemRequest("Consultation Booked", null, "#0EA5E9")));
-        Assert.Equal("booked", renamed.SystemKey);
+        // Renaming a built-in status is fine.
+        var renamed = await DataAsync<LookupItemDto>(await admin.PutAsJsonAsync($"/api/stages/{customer.Id}",
+            new SaveLookupItemRequest("Patient", null, "#0EA5E9")));
+        Assert.Equal("customer", renamed.SystemKey);
+        await DataAsync<LookupItemDto>(await admin.PutAsJsonAsync($"/api/stages/{customer.Id}", new SaveLookupItemRequest("Customer", null, "#22C55E")));
 
         var vip = await DataAsync<LookupItemDto>(await admin.PostAsJsonAsync("/api/stages", new SaveLookupItemRequest("VIP", null, "#e11d48")));
         Assert.Equal("#E11D48", vip.Color);

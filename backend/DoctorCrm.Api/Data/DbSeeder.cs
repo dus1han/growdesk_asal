@@ -69,10 +69,7 @@ public class DbSeeder(AppDbContext db, IConfiguration config, ILogger<DbSeeder> 
         [
             ("Interested", StageKeys.Interested, "#6366F1"),
             ("Follow-up", StageKeys.FollowUp, "#F59E0B"),
-            ("Booked", StageKeys.Booked, "#0EA5E9"),
-            ("Consultation Completed", StageKeys.ConsultationCompleted, "#14B8A6"),
-            ("Treatment Started", StageKeys.TreatmentStarted, "#8B5CF6"),
-            ("Completed", StageKeys.Completed, "#22C55E"),
+            ("Customer", StageKeys.Customer, "#22C55E"),
             ("Lost", StageKeys.Lost, "#94A3B8"),
         ];
 

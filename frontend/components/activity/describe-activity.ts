@@ -48,7 +48,7 @@ function describeAction(a: Pick<Activity, "action" | "details">): ActivityView {
     case "Customer Created":
       return { icon: UserPlus, title: "Customer added", tone: "bg-emerald-50 text-emerald-600" };
     case "Stage Changed":
-      return { icon: Layers, title: `Moved to ${String(d.to ?? "")}`, detail: d.from ? `from ${String(d.from)}` : undefined, tone: "bg-brand-soft text-brand" };
+      return { icon: Layers, title: `Status: ${String(d.to ?? "")}`, detail: d.from ? `was ${String(d.from)}` : undefined, tone: "bg-brand-soft text-brand" };
     case "Treatment Added": {
       const list = Array.isArray(d.treatments) ? (d.treatments as string[]).join(", ") : "";
       return { icon: Sparkles, title: `Interested in ${list}`, tone: "bg-fuchsia-50 text-fuchsia-600" };
