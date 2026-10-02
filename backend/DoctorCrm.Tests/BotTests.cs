@@ -287,6 +287,35 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task The_bot_can_cancel_its_customers_booking_which_frees_the_time()
+    {
+        var (admin, bot, t) = await SetUpAsync();
+        var day = Day();
+        var number = await SavedAsync(bot, "Canceller", [t[0]]);
+        var booked = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(number, [t[0]], day, "15:00", null)));
+        var id = booked.Booking.BookingId;
+
+        // Someone else's number can't cancel it.
+        Assert.Equal(HttpStatusCode.NotFound, (await bot.PostAsJsonAsync($"/api/bot/bookings/{id}/cancel", new BotCancelRequest(Number(), null))).StatusCode);
+
+        var cancelled = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync($"/api/bot/bookings/{id}/cancel", new BotCancelRequest(number, "Can't make it")));
+        Assert.Equal("cancelled", cancelled.Action);
+        Assert.Equal("Cancelled", cancelled.Booking.Status);
+
+        var detail = await DataAsync<BookingDetailDto>(await admin.GetAsync($"/api/bookings/{id}"));
+        Assert.Equal("Cancelled", detail.Status);
+        Assert.Equal("Customer request", detail.CancellationReason!.Name);
+        Assert.Equal("Can't make it (via WhatsApp BOT)", detail.CancellationNote);
+
+        // The time is free again, it no longer shows as upcoming, and it can't be cancelled twice.
+        Assert.Contains("15:00", (await DataAsync<BotAvailabilityDto>(await bot.GetAsync($"/api/bot/availability?date={day}"))).FreeTimes);
+        Assert.Empty(await DataAsync<List<BotBookingDto>>(await bot.GetAsync($"/api/bot/bookings?whatsapp={Uri.EscapeDataString(number)}")));
+        Assert.Equal(HttpStatusCode.Conflict, (await bot.PostAsJsonAsync($"/api/bot/bookings/{id}/cancel", new BotCancelRequest(number, null))).StatusCode);
+        var customer = await DataAsync<CustomerDetailDto>(await admin.GetAsync($"/api/customers/{detail.Customer.Id}"));
+        Assert.Equal("missed", customer.Consultation.State);
+    }
+
+    [Fact]
     public async Task A_bot_booking_is_pushed_live_to_open_GrowDesk_screens()
     {
         var (admin, bot, t) = await SetUpAsync();

@@ -163,6 +163,45 @@ public class BotService(
         return new BotBookingResultDto(moving ? "rescheduled" : "updated", await ToBotAsync(resultId, ct), moving ? bookingId : null);
     }
 
+    /// <summary>
+    /// The customer cancels through the bot. The booking is kept as Cancelled (never deleted), with
+    /// the reason "Customer request" and a note saying it came through the bot.
+    /// </summary>
+    public async Task<BotBookingResultDto> CancelAsync(int bookingId, BotCancelRequest r, string client, CancellationToken ct)
+    {
+        var number = Phone(r.WhatsApp);
+        var note = r.Note?.Trim();
+        if (note?.Length > 500) throw new BusinessRuleException("The note can be at most 500 characters.", field: "note");
+
+        var booking = await db.Bookings.AsNoTracking().Include(b => b.Customer).SingleOrDefaultAsync(b => b.Id == bookingId, ct);
+        // Someone else's booking looks the same as a missing one, so IDs can't be probed.
+        if (booking is null || booking.Customer.WhatsAppNumber != number)
+            throw BusinessRuleException.NotFound("Booking");
+        if (booking.Status != BookingStatus.Booked)
+            throw new BusinessRuleException($"This booking is already {booking.Status.ToString().ToLowerInvariant()}, so it can't be cancelled.", StatusCodes.Status409Conflict);
+
+        var reasonId = await CancellationReasonIdAsync(ct);
+        await bookings.CancelAsync(bookingId, new CancelBookingRequest(reasonId,
+            string.IsNullOrEmpty(note) ? $"Cancelled by the customer through the {SourceName}." : $"{note} (via {SourceName})"), null, ct);
+        audit.Record(null, "Bot Booking Change", nameof(Booking), bookingId, new { source = SourceName, client, cancelled = true });
+        await db.SaveChangesAsync(ct);
+
+        await PublishAsync(bookingId, "booking.cancelled", ct);
+        return new BotBookingResultDto("cancelled", await ToBotAsync(bookingId, ct), null);
+    }
+
+    /// <summary>"Customer request" if the clinic has it, else their first active reason; added if there is none.</summary>
+    private async Task<int> CancellationReasonIdAsync(CancellationToken ct)
+    {
+        var active = await db.CancellationReasons.Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).Select(x => new { x.Id, x.Name }).ToListAsync(ct);
+        var match = active.FirstOrDefault(x => string.Equals(x.Name, "Customer request", StringComparison.OrdinalIgnoreCase)) ?? active.FirstOrDefault();
+        if (match is not null) return match.Id;
+        var reason = new CancellationReason { Name = "Customer request", IsActive = true, DisplayOrder = 1 };
+        db.CancellationReasons.Add(reason);
+        await db.SaveChangesAsync(ct);
+        return reason.Id;
+    }
+
     // ---- Live updates ----------------------------------------------------------------------------------
 
     /// <summary>

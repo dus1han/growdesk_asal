@@ -62,7 +62,7 @@ public class LiveController(LiveEvents live, AppDbContext db, IHostApplicationLi
                 {
                     var e = await reader.ReadAsync(wait.Token);
                     // Already sent during the catch-up.
-                    if (e.Type != "booking.updated" && e.BookingId <= lastId) continue;
+                    if (CarriesId(e) && e.BookingId <= lastId) continue;
                     await SendAsync(e, ct);
                 }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -81,10 +81,12 @@ public class LiveController(LiveEvents live, AppDbContext db, IHostApplicationLi
         }
     }
 
+    /// <summary>Only new bookings carry an ID (it is what a reconnect resumes from); changes to older ones don't.</summary>
+    private static bool CarriesId(LiveBookingEventDto e) => e.Type is "booking.created" or "booking.rescheduled";
+
     private async Task SendAsync(LiveBookingEventDto e, CancellationToken ct)
     {
-        // Only new bookings carry an ID: it is what a reconnect resumes from.
-        var idLine = e.Type == "booking.updated" ? "" : $"id: {e.BookingId}\n";
+        var idLine = CarriesId(e) ? $"id: {e.BookingId}\n" : "";
         await WriteAsync($"{idLine}event: {e.Type}\ndata: {JsonSerializer.Serialize(e, JsonSerializerOptions.Web)}\n\n", ct);
     }
 

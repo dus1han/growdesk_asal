@@ -73,6 +73,14 @@ public class BotController(CaptureClientService clients, BotService bot) : Contr
             ? $"Moved to {result.Booking.Date} {result.Booking.StartTime}."
             : "Booking updated."));
     }
+
+    /// <summary>Cancels a booked consultation for the customer (kept as Cancelled, never deleted).</summary>
+    [HttpPost("bookings/{id:int}/cancel")]
+    public async Task<ActionResult<ApiResponse<BotBookingResultDto>>> Cancel(int id, BotCancelRequest request, CancellationToken ct)
+    {
+        var result = await bot.CancelAsync(id, request, Client, ct);
+        return Ok(ApiResponse<BotBookingResultDto>.Ok(result, $"Cancelled the consultation on {result.Booking.Date} {result.Booking.StartTime}."));
+    }
 }
 
 /// <summary>Admin: weekly opening hours and the bot's booking length.</summary>

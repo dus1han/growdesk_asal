@@ -6,7 +6,7 @@ This guide is for the developer connecting a WhatsApp chatbot to the clinic's CR
 - list the treatments a customer can choose;
 - find free consultation times on a day;
 - book a consultation;
-- look up, move or change a customer's booking.
+- look up, move, change or cancel a customer's booking.
 
 The bot only sends what the customer said or chose. The WhatsApp BOT API applies all the clinic's rules:
 
@@ -65,7 +65,7 @@ The `message` is written for people, so the bot can pass it on or reword it. `er
 | 401 | No token, or it expired or was revoked | Get a new token (section 3) and retry once |
 | 403 | This connection isn't a bot connection | Ask the admin for a **WhatsApp BOT** connection |
 | 404 | Customer not saved yet (booking), or booking not found for this WhatsApp number | Save the customer first (section 4), or check the booking ID and number |
-| 409 | The time is taken or blocked, or the booking can no longer be changed | Offer the free times in `data.freeTimes` (section 7) |
+| 409 | The time is taken or blocked, or the booking can no longer be changed or cancelled | Offer the free times in `data.freeTimes` (section 7) |
 | 429 | Too many requests | Wait a minute and retry |
 | 500 | Something went wrong on the server | Retry later; tell the customer the clinic will confirm |
 
@@ -361,9 +361,55 @@ Changing only treatments or notes keeps the same ID, with `action: "updated"`.
 | 409 | The new time is taken or blocked (with `freeTimes`), or the booking is no longer *Booked* (completed, cancelled, already moved) |
 | 400 | Only one of `date`/`startTime` was sent, nothing to change was sent, or a value is invalid |
 
-Cancelling is not available to the bot. The clinic cancels bookings in the CRM.
+## 10. Cancel a booking: `POST /bookings/{bookingId}/cancel`
 
-## 10. A typical conversation
+Cancels a booked consultation when the customer asks. Send the customer's `whatsapp` number, which must be the booking customer's number, and an optional `note` (up to 500 characters).
+
+```http
+POST /api/bot/bookings/873/cancel
+Authorization: Bearer …
+Content-Type: application/json
+
+{ "whatsapp": "+971501234567", "note": "Travelling that week" }
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "action": "cancelled",
+    "previousBookingId": null,
+    "booking": {
+      "bookingId": 873,
+      "customerId": 1052,
+      "customerName": "Sarah Fernando",
+      "date": "2026-10-05",
+      "startTime": "16:00",
+      "endTime": "16:45",
+      "treatments": [{ "id": 1, "name": "Botox" }],
+      "status": "Cancelled",
+      "notes": null
+    }
+  },
+  "message": "Cancelled the consultation on 2026-10-05 16:00."
+}
+```
+
+What the API does:
+
+- The booking is kept with status *Cancelled*; it is never deleted. The reason is recorded as *Customer request*, with the bot's note.
+- The time becomes free straight away, and the clinic sees the cancellation on its screens.
+- The booking no longer appears in `GET /bookings?whatsapp=…`.
+
+| Answer | When |
+|---|---|
+| 404 | The booking doesn't exist, or belongs to a different WhatsApp number |
+| 409 | The booking is no longer *Booked* (already cancelled, completed or moved) |
+| 400 | The WhatsApp number is invalid, or the note is longer than 500 characters |
+
+To move a booking to another time, use `PATCH` (section 9) instead of cancelling and booking again.
+
+## 11. A typical conversation
 
 1. **A new message arrives.** Call `POST /customers` with the contact's name and number, and the treatment they ask about once you know it. They are now an interested customer.
 2. **The customer asks for a treatment.** Match it to `GET /treatments`. If it's a new interest, call `POST /customers` again to add it.
@@ -377,14 +423,15 @@ Cancelling is not available to the bot. The clinic cancels bookings in the CRM.
     - Call `GET /bookings?whatsapp=…` to find it.
     - Call `PATCH /bookings/{bookingId}` to change it.
     - Keep the new `bookingId` from the reply.
+6. **The customer wants to cancel.** Call `GET /bookings?whatsapp=…` to find the booking, confirm which one with the customer, then call `POST /bookings/{bookingId}/cancel`.
 
-## 11. Limits
+## 12. Limits
 
 - **Token requests:** 10 per minute.
 - **Other calls:** 120 per minute from the same server.
 - **Over the limit:** the API answers **429**. Wait a minute before retrying.
 
-## 12. Quick test with curl
+## 13. Quick test with curl
 
 ```bash
 API=http://169.58.92.105:3110/api/bot

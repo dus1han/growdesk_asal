@@ -8,9 +8,9 @@ import { BookingDetailsDrawer } from "@/components/bookings/booking-details-draw
 import { formatTime } from "@/components/bookings/booking-status";
 import { cn } from "@/lib/utils";
 
-/** A booking the WhatsApp BOT just made or moved (backend LiveBookingEventDto). */
+/** A booking the WhatsApp BOT just made, moved or cancelled (backend LiveBookingEventDto). */
 interface LiveBookingEvent {
-  type: "booking.created" | "booking.rescheduled" | "booking.updated";
+  type: "booking.created" | "booking.rescheduled" | "booking.cancelled" | "booking.updated";
   bookingId: number;
   customerId: number;
   customerName: string;
@@ -23,7 +23,7 @@ interface LiveBookingEvent {
   createdAt: string;
 }
 
-const EVENT_TYPES = ["booking.created", "booking.rescheduled", "booking.updated"] as const;
+const EVENT_TYPES = ["booking.created", "booking.rescheduled", "booking.cancelled", "booking.updated"] as const;
 const SHOW_MS = 10_000;
 const MAX_CARDS = 3;
 /** After the server refuses or drops the stream for good (e.g. a deploy), try again after this. */
@@ -139,7 +139,8 @@ function LiveBookingCard({ booking, onClose, onOpen }: { booking: LiveBookingEve
   }, [hovered, onClose]);
 
   const moved = booking.type === "booking.rescheduled";
-  const badge = moved ? "Moved" : booking.newCustomer ? "New customer" : "Booked";
+  const cancelled = booking.type === "booking.cancelled";
+  const badge = cancelled ? "Cancelled" : moved ? "Moved" : booking.newCustomer ? "New customer" : "Booked";
 
   return (
     <motion.div
@@ -160,7 +161,7 @@ function LiveBookingCard({ booking, onClose, onOpen }: { booking: LiveBookingEve
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.07em] text-brand">
             <Bot className="size-3.5" />
-            {moved ? "Booking moved" : "New booking"} · {booking.source}
+            {cancelled ? "Booking cancelled" : moved ? "Booking moved" : "New booking"} · {booking.source}
           </span>
           <button
             type="button"
@@ -182,7 +183,7 @@ function LiveBookingCard({ booking, onClose, onOpen }: { booking: LiveBookingEve
               <span
                 className={cn(
                   "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                  moved ? "bg-amber-50 text-amber-700" : booking.newCustomer ? "bg-emerald-50 text-emerald-700" : "bg-brand-soft text-brand-strong",
+                  cancelled ? "bg-red-50 text-red-700" : moved ? "bg-amber-50 text-amber-700" : booking.newCustomer ? "bg-emerald-50 text-emerald-700" : "bg-brand-soft text-brand-strong",
                 )}
               >
                 {badge}
@@ -190,7 +191,7 @@ function LiveBookingCard({ booking, onClose, onOpen }: { booking: LiveBookingEve
             </span>
             <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
               <CalendarClock className="size-3.5 shrink-0" />
-              <span className="truncate">
+              <span className={cn("truncate", cancelled && "line-through")}>
                 {shortDate(booking.date)} · {formatTime(booking.startTime)} – {formatTime(booking.endTime)}
               </span>
             </span>

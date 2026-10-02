@@ -33,6 +33,9 @@ public record BotBookingRequest(string? WhatsApp, IReadOnlyList<int>? TreatmentI
 /// </summary>
 public record BotBookingUpdateRequest(string? WhatsApp, string? Date, string? StartTime, IReadOnlyList<int>? TreatmentIds, string? Notes);
 
+/// <summary>Cancels a booked consultation. <c>WhatsApp</c> must be the booking customer's number; <c>Note</c> is optional (≤500).</summary>
+public record BotCancelRequest(string? WhatsApp, string? Note);
+
 public record BotTreatmentRef(int Id, string Name);
 
 public record BotBookingDto(
@@ -47,7 +50,7 @@ public record BotBookingDto(
     string? Notes);
 
 /// <summary>
-/// <c>Action</c>: "booked", "updated" or "rescheduled". A reschedule creates a new booking (the
+/// <c>Action</c>: "booked", "updated", "rescheduled" or "cancelled". A reschedule creates a new booking (the
 /// old one is kept as Rescheduled), so <c>Booking.BookingId</c> is then the new ID and
 /// <c>PreviousBookingId</c> the old one.
 /// </summary>
