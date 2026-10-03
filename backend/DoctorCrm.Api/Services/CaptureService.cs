@@ -97,6 +97,7 @@ public partial class CaptureService(AppDbContext db, AuditService audit, Contact
             };
             foreach (var id in lead.TreatmentIds)
                 customer.Treatments.Add(new CustomerTreatment { TreatmentId = id, CreatedAt = DateTime.UtcNow });
+            TreatmentPlaceholder.Tidy(customer, await TreatmentPlaceholder.IdsAsync(db, ct));
             foreach (var (fieldId, value) in lead.CustomValues)
                 customer.CustomFieldValues.Add(new CustomerCustomFieldValue { CustomFieldId = fieldId, Value = value, UpdatedAt = DateTime.UtcNow });
 
@@ -167,6 +168,7 @@ public partial class CaptureService(AppDbContext db, AuditService audit, Contact
         var added = lead.TreatmentIds.Where(id => !known.Contains(id)).ToList();
         foreach (var id in added)
             customer.Treatments.Add(new CustomerTreatment { TreatmentId = id, CreatedAt = DateTime.UtcNow });
+        TreatmentPlaceholder.Tidy(customer, await TreatmentPlaceholder.IdsAsync(db, ct));
         if (added.Count > 0)
         {
             var names = await db.Treatments.Where(t => added.Contains(t.Id)).Select(t => t.Name).ToListAsync(ct);
