@@ -122,7 +122,8 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
             ?? throw new BusinessRuleException("Choose a customer.", field: "customerId");
 
         await EnsureDoctorAsync(r.DoctorId, null, ct);
-        var treatmentIds = await ValidateTreatmentsAsync(r.TreatmentIds, new HashSet<int>(), ct);
+        // Staff always choose a treatment; the WhatsApp BOT may not know it yet (chosen when completing).
+        var treatmentIds = await ValidateTreatmentsAsync(r.TreatmentIds, new HashSet<int>(), ct, allowEmpty: source is not null);
         await EnsureNotBlockedAsync(r.Date, r.StartTime, r.EndTime, ct);
         await EnsureNoOverlapAsync(r.Date, r.StartTime, r.EndTime, r.DoctorId, excludeId: null, ct);
 
@@ -153,7 +154,7 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
         await EnsureDoctorAsync(r.DoctorId, booking.DoctorId, ct);
 
         var current = booking.Treatments.Select(t => t.TreatmentId).ToHashSet();
-        var treatmentIds = await ValidateTreatmentsAsync(r.TreatmentIds, current, ct);
+        var treatmentIds = await ValidateTreatmentsAsync(r.TreatmentIds, current, ct, allowEmpty: current.Count == 0);
 
         if (r.DoctorId != booking.DoctorId)
             await EnsureNoOverlapAsync(booking.BookingDate, booking.StartTime, booking.EndTime, r.DoctorId, booking.Id, ct);
@@ -174,6 +175,24 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
     {
         var booking = await LoadBookedAsync(id, "completed", ct);
         var status = Enum.Parse<PaymentStatus>(r.PaymentStatus, ignoreCase: true);
+
+        // A booking made without a treatment gets one now: what was actually done. It joins the
+        // customer's interests too.
+        if (booking.Treatments.Count == 0)
+        {
+            if (r.TreatmentIds is not { Count: > 0 })
+                throw new BusinessRuleException("Choose the treatment for this consultation.", field: "treatmentIds");
+            var chosen = await ValidateTreatmentsAsync(r.TreatmentIds, new HashSet<int>(), ct);
+            foreach (var tid in chosen) booking.Treatments.Add(new BookingTreatment { TreatmentId = tid });
+            var customer = await db.Customers.Include(c => c.Treatments).SingleAsync(c => c.Id == booking.CustomerId, ct);
+            var added = chosen.Where(tid => customer.Treatments.All(t => t.TreatmentId != tid)).ToList();
+            foreach (var tid in added) customer.Treatments.Add(new CustomerTreatment { TreatmentId = tid, CreatedAt = DateTime.UtcNow });
+            if (added.Count > 0)
+            {
+                var names = await db.Treatments.Where(t => added.Contains(t.Id)).Select(t => t.Name).ToListAsync(ct);
+                audit.Record(userId, "Treatment Added", nameof(Customer), customer.Id, new { treatments = names });
+            }
+        }
 
         if (status == PaymentStatus.Paid && r.PaymentMethodId is null)
             throw new BusinessRuleException("Choose how the customer paid.", field: "paymentMethodId");
@@ -332,9 +351,10 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
             throw new BusinessRuleException("Choose an active doctor.", field: "doctorId");
     }
 
-    private async Task<List<int>> ValidateTreatmentsAsync(IReadOnlyList<int> requested, IReadOnlySet<int> current, CancellationToken ct)
+    private async Task<List<int>> ValidateTreatmentsAsync(IReadOnlyList<int> requested, IReadOnlySet<int> current, CancellationToken ct, bool allowEmpty = false)
     {
         var ids = requested.Distinct().ToList();
+        if (ids.Count == 0 && allowEmpty) return ids;
         if (ids.Count == 0) throw new BusinessRuleException("Choose at least one treatment.", field: "treatmentIds");
         var valid = await db.Treatments.CountAsync(t => ids.Contains(t.Id) && (t.IsActive || current.Contains(t.Id)), ct);
         if (valid != ids.Count) throw new BusinessRuleException("One of the selected treatments is no longer available.", field: "treatmentIds");

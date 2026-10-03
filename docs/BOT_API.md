@@ -121,7 +121,7 @@ Content-Type: application/json
 |---|---|---|
 | `name` | Yes | Up to 150 characters, e.g. the WhatsApp profile name. Used only when the customer is new. |
 | `whatsapp` | Yes | With country code. |
-| `treatmentIds` | Yes | At least one ID from `GET /treatments`. Added to the customer's interests, never removed. |
+| `treatmentIds` | No | IDs from `GET /treatments`, added to the customer's interests (never removed). Send `[]` or leave it out when the contact hasn't said yet, e.g. on their first message. |
 | `notes` | No | Added to the customer's notes. Up to 2000 characters. |
 
 ```json
@@ -217,7 +217,7 @@ Content-Type: application/json
 | Field | Required | Notes |
 |---|---|---|
 | `whatsapp` | Yes | The customer's WhatsApp number, as saved with `POST /customers`. |
-| `treatmentIds` | Yes | At least one ID from `GET /treatments`. They are also added to the customer's interests. |
+| `treatmentIds` | No | IDs from `GET /treatments`; also added to the customer's interests. Send the treatment whenever you can identify it. If you can't, send `[]`: the clinic chooses the treatment when completing the consultation. |
 | `date` | Yes | `yyyy-MM-dd`. |
 | `startTime` | Yes | `HH:mm`. The end time is the start plus the clinic's booking length (45 minutes by default). |
 | `notes` | No | Saved on the booking. Up to 2000 characters. |
@@ -316,7 +316,7 @@ Authorization: Bearer …
 Send the customer's `whatsapp` number, which must be the booking customer's number, plus only what changes:
 
 - **Move it:** send `date` **and** `startTime` together. The end time is worked out again. The booking rules apply: opening hours, clashes, blocked time, not in the past.
-- **Change treatments:** send `treatmentIds`. They replace the booking's treatments.
+- **Change treatments:** send `treatmentIds` (at least one). They replace the booking's treatments, e.g. once the customer says what they want.
 - **Change the note:** send `notes`. It replaces the booking's note; send `""` to clear it.
 
 You can do all three in one call.

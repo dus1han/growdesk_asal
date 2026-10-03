@@ -116,15 +116,44 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Lead_needs_a_name_a_valid_number_and_a_treatment()
+    public async Task Lead_needs_a_name_and_a_valid_number_but_the_treatment_can_wait()
     {
-        var (_, bot, t) = await SetUpAsync();
+        var (admin, bot, t) = await SetUpAsync();
         Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("", Number(), [t[0]], null))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("A", "12", [t[0]], null))).StatusCode);
-        var none = await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("A", Number(), [], null));
-        Assert.Equal(HttpStatusCode.BadRequest, none.StatusCode);
-        Assert.Equal("treatmentIds", (await BodyAsync(none)).Errors.Single().Field);
         Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("A", Number(), [999999], null))).StatusCode);
+
+        // A new contact before they say what they want: saved with no treatment.
+        var none = await DataAsync<BotLeadResultDto>(await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("No Treatment Nia", Number(), [], null)));
+        Assert.Equal("created", none.Action);
+        var noField = await DataAsync<BotLeadResultDto>(await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("No Field Nuha", Number(), null, null)));
+        Assert.Empty((await DataAsync<CustomerDetailDto>(await admin.GetAsync($"/api/customers/{noField.CustomerId}"))).Treatments);
+    }
+
+    [Fact]
+    public async Task A_booking_without_a_treatment_needs_one_chosen_when_completing()
+    {
+        var (admin, bot, t) = await SetUpAsync();
+        var number = Number();
+        var lead = await DataAsync<BotLeadResultDto>(await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("Unsure Umar", number, [], null)));
+        var booked = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings", new BotBookingRequest(number, [], Day(), "11:00", null)));
+        Assert.Empty(booked.Booking.Treatments);
+        var id = booked.Booking.BookingId;
+
+        // The bot can still change the note on it.
+        await DataAsync<BotBookingResultDto>(await bot.PatchAsJsonAsync($"/api/bot/bookings/{id}", new BotBookingUpdateRequest(number, null, null, null, "Wants advice")));
+
+        var methods = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/payment-methods"));
+        var missing = await admin.PostAsJsonAsync($"/api/bookings/{id}/complete", new CompleteBookingRequest(100, "Paid", methods[0].Id, null, null, null));
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+        Assert.Equal("treatmentIds", (await BodyAsync(missing)).Errors.Single().Field);
+
+        var done = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{id}/complete",
+            new CompleteBookingRequest(100, "Paid", methods[0].Id, null, null, null, [t[1]])));
+        Assert.Equal("Completed", done.Status);
+        Assert.Equal(t[1], Assert.Single(done.Treatments).Id);
+        var customer = await DataAsync<CustomerDetailDto>(await admin.GetAsync($"/api/customers/{lead.CustomerId}"));
+        Assert.Equal(t[1], Assert.Single(customer.Treatments).Id);
     }
 
     [Fact]

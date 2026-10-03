@@ -167,6 +167,11 @@ function Details({
               {t.name}
             </span>
           ))}
+          {booking.treatments.length === 0 && (
+            <span className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+              Treatment not chosen yet
+            </span>
+          )}
         </div>
       </div>
 
@@ -387,8 +392,13 @@ const completeSchema = z
     nextTreatmentDate: z.string(),
     nextTreatmentId: z.number().nullable(),
     doctorNotes: z.string().max(4000),
+    /** Only asked for when the booking has no treatment yet. */
+    treatmentIds: z.array(z.number()),
+    needsTreatment: z.boolean(),
   })
   .superRefine((v, ctx) => {
+    if (v.needsTreatment && v.treatmentIds.length === 0)
+      ctx.addIssue({ code: "custom", path: ["treatmentIds"], message: "Choose the treatment for this consultation." });
     if (v.paymentStatus === "Paid" && v.paymentMethodId === null)
       ctx.addIssue({ code: "custom", path: ["paymentMethodId"], message: "Choose how the customer paid." });
     if (v.nextTreatmentDate && v.nextTreatmentId === null)
@@ -420,9 +430,12 @@ function CompleteForm({ booking, onDone }: { booking: BookingDetail; onDone: () 
       nextTreatmentDate: "",
       nextTreatmentId: null,
       doctorNotes: "",
+      treatmentIds: [],
+      needsTreatment: booking.treatments.length === 0,
     },
   });
   const status = useWatch({ control, name: "paymentStatus" });
+  const chosenTreatments = useWatch({ control, name: "treatmentIds" });
 
   const onSubmit = handleSubmit(async (v) => {
     try {
@@ -434,6 +447,7 @@ function CompleteForm({ booking, onDone }: { booking: BookingDetail; onDone: () 
         nextTreatmentDate: v.nextTreatmentDate || null,
         nextTreatmentId: v.nextTreatmentId,
         doctorNotes: v.doctorNotes || null,
+        treatmentIds: v.needsTreatment ? v.treatmentIds : null,
       });
       onDone();
     } catch (error) {
@@ -447,13 +461,46 @@ function CompleteForm({ booking, onDone }: { booking: BookingDetail; onDone: () 
 
   return (
     <form id="booking-complete-form" onSubmit={onSubmit} className="space-y-5" noValidate>
-      <div className="flex flex-wrap gap-1.5">
-        {booking.treatments.map((t) => (
-          <span key={t.id} className="rounded-lg bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand-strong">
-            {t.name}
-          </span>
-        ))}
-      </div>
+      {booking.treatments.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {booking.treatments.map((t) => (
+            <span key={t.id} className="rounded-lg bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand-strong">
+              {t.name}
+            </span>
+          ))}
+        </div>
+      ) : (
+        // Booked without a treatment (the WhatsApp BOT couldn't tell): choose what was done.
+        <fieldset>
+          <legend className="mb-2 text-[13px] font-medium">
+            Treatment
+            <RequiredMark />
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {treatments.data?.map((t) => {
+              const on = chosenTreatments.includes(t.id);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() =>
+                    setValue("treatmentIds", on ? chosenTreatments.filter((id) => id !== t.id) : [...chosenTreatments, t.id], { shouldValidate: true })
+                  }
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",
+                    on ? "border-brand bg-brand-soft text-brand-strong" : "border-line text-foreground/70 hover:border-slate-300",
+                  )}
+                >
+                  {on && "✓ "}
+                  {t.name}
+                </button>
+              );
+            })}
+          </div>
+          {errors.treatmentIds?.message && <p className="mt-1.5 text-xs text-danger">{errors.treatmentIds.message}</p>}
+        </fieldset>
+      )}
       {booking.notes && (
         <NoteCard label="Consultation notes" icon={StickyNote}>
           {booking.notes}

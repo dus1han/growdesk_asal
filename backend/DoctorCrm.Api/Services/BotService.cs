@@ -69,7 +69,7 @@ public class BotService(
     {
         var name = Name(r.Name);
         var number = Phone(r.WhatsApp);
-        var treatmentIds = await TreatmentIdsAsync(r.TreatmentIds, ct);
+        var treatmentIds = await TreatmentIdsAsync(r.TreatmentIds, ct, allowEmpty: true);
         var notes = Notes(r.Notes);
 
         var (customer, action) = await UpsertCustomerAsync(name, number, treatmentIds, notes, client, ct);
@@ -86,7 +86,8 @@ public class BotService(
     public async Task<BotBookingResultDto> BookAsync(BotBookingRequest r, string client, CancellationToken ct)
     {
         var number = Phone(r.WhatsApp);
-        var treatmentIds = await TreatmentIdsAsync(r.TreatmentIds, ct);
+        // Empty when the bot couldn't tell: the treatment is then chosen when the consultation is completed.
+        var treatmentIds = await TreatmentIdsAsync(r.TreatmentIds, ct, allowEmpty: true);
         var notes = Notes(r.Notes);
         var (day, start, end) = await SlotAsync(r.Date, r.StartTime, ct);
 
@@ -432,9 +433,10 @@ public class BotService(
             ?? throw new BusinessRuleException("The WhatsApp number isn't valid. Send it with the country code, e.g. +971501234567.", field: "whatsapp");
     }
 
-    private async Task<List<int>> TreatmentIdsAsync(IReadOnlyList<int>? requested, CancellationToken ct)
+    private async Task<List<int>> TreatmentIdsAsync(IReadOnlyList<int>? requested, CancellationToken ct, bool allowEmpty = false)
     {
         var ids = requested?.Distinct().ToList() ?? [];
+        if (ids.Count == 0 && allowEmpty) return ids;
         if (ids.Count == 0) throw new BusinessRuleException("Send at least one treatment ID (see GET /api/bot/treatments).", field: "treatmentIds");
         var active = await db.Treatments.Where(t => ids.Contains(t.Id) && t.IsActive).Select(t => t.Id).ToListAsync(ct);
         var unknown = ids.Except(active).ToList();

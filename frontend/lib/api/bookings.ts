@@ -105,6 +105,8 @@ export interface CompleteBooking {
   nextTreatmentDate: string | null;
   nextTreatmentId: number | null;
   doctorNotes: string | null;
+  /** Only when the booking has no treatment yet. */
+  treatmentIds?: number[] | null;
 }
 
 /** Every booking action refreshes the calendar, lists and the affected customer. */

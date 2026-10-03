@@ -90,7 +90,9 @@ public record CompleteBookingRequest(
     int? PaymentMethodId,
     DateOnly? NextTreatmentDate,
     int? NextTreatmentId,
-    string? DoctorNotes);
+    string? DoctorNotes,
+    /// <summary>Required when the booking has no treatment yet (the WhatsApp BOT couldn't tell): what was done.</summary>
+    IReadOnlyList<int>? TreatmentIds = null);
 
 public record RescheduleBookingRequest(DateOnly Date, TimeOnly StartTime, TimeOnly EndTime, int? DoctorId);
 
