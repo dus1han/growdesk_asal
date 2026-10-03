@@ -136,7 +136,6 @@ What the API does:
 
 - **New number:** creates the customer, with lead source **WhatsApp BOT**.
 - **Known number:** returns `action: "updated"` with the same `customerId`. The customer's name and source don't change.
-- **Treatment not known yet:** if the clinic has a treatment named `-`, send its ID. It's removed from the customer automatically as soon as a real treatment is added, by a later `POST /customers` or a booking.
 
 ## 5. Treatments: `GET /treatments`
 

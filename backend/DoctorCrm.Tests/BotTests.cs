@@ -116,36 +116,6 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task The_dash_placeholder_treatment_goes_once_a_real_treatment_is_known()
-    {
-        var (admin, bot, t) = await SetUpAsync();
-        var all = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/treatments"));
-        var dash = all.FirstOrDefault(x => x.Name == "-")
-                   ?? await DataAsync<LookupItemDto>(await admin.PostAsJsonAsync("/api/treatments", new SaveLookupItemRequest("-", null, null)));
-
-        async Task<string[]> Interests(int id) =>
-            (await DataAsync<CustomerDetailDto>(await admin.GetAsync($"/api/customers/{id}"))).Treatments.Select(x => x.Name).ToArray();
-
-        // Saved before they say what they want: "-" is all there is, so it stays.
-        var number = Number();
-        var lead = await DataAsync<BotLeadResultDto>(await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("Dash Dana", number, [dash.Id], null)));
-        Assert.Equal(["-"], await Interests(lead.CustomerId));
-
-        // A booking with a real treatment: the placeholder goes from the customer.
-        var booked = await DataAsync<BotBookingResultDto>(await bot.PostAsJsonAsync("/api/bot/bookings",
-            new BotBookingRequest(number, [dash.Id, t[0]], Day(), "10:00", null)));
-        Assert.Equal(t[0], Assert.Single(booked.Booking.Treatments).Id);
-        Assert.DoesNotContain("-", await Interests(lead.CustomerId));
-
-        // "-" sent alongside a real treatment is never added.
-        var other = await DataAsync<BotLeadResultDto>(await bot.PostAsJsonAsync("/api/bot/customers", new BotLeadRequest("Dash Dev", Number(), [dash.Id, t[1]], null)));
-        Assert.DoesNotContain("-", await Interests(other.CustomerId));
-        Assert.Single(await Interests(other.CustomerId));
-
-        await DataAsync<LookupItemDto>(await admin.PatchAsJsonAsync($"/api/treatments/{dash.Id}/active", new SetActiveRequest(false)));
-    }
-
-    [Fact]
     public async Task Lead_needs_a_name_a_valid_number_and_a_treatment()
     {
         var (_, bot, t) = await SetUpAsync();

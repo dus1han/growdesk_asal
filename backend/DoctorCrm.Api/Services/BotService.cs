@@ -256,7 +256,6 @@ public class BotService(
             };
             foreach (var id in treatmentIds)
                 customer.Treatments.Add(new CustomerTreatment { TreatmentId = id, CreatedAt = DateTime.UtcNow });
-            TreatmentPlaceholder.Tidy(customer, await TreatmentPlaceholder.IdsAsync(db, ct));
             db.Customers.Add(customer);
             await SaveAsync(ct);
             audit.Record(null, "Customer Created", nameof(Customer), customer.Id, new { customer.Name, source = SourceName, client });
@@ -295,7 +294,6 @@ public class BotService(
         var added = treatmentIds.Where(id => !known.Contains(id)).ToList();
         foreach (var id in added)
             customer.Treatments.Add(new CustomerTreatment { TreatmentId = id, CreatedAt = DateTime.UtcNow });
-        TreatmentPlaceholder.Tidy(customer, await TreatmentPlaceholder.IdsAsync(db, ct));
         if (added.Count > 0)
         {
             var names = await db.Treatments.Where(t => added.Contains(t.Id)).Select(t => t.Name).ToListAsync(ct);
@@ -442,7 +440,7 @@ public class BotService(
         var unknown = ids.Except(active).ToList();
         if (unknown.Count > 0)
             throw new BusinessRuleException($"Treatment {string.Join(", ", unknown)} is not available. Use an ID from GET /api/bot/treatments.", field: "treatmentIds");
-        return TreatmentPlaceholder.Strip(ids, await TreatmentPlaceholder.IdsAsync(db, ct));
+        return ids;
     }
 
     private static string? Notes(string? value)

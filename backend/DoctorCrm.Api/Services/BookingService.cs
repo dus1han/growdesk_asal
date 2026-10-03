@@ -338,7 +338,7 @@ public class BookingService(AppDbContext db, AuditService audit, StageAutomation
         if (ids.Count == 0) throw new BusinessRuleException("Choose at least one treatment.", field: "treatmentIds");
         var valid = await db.Treatments.CountAsync(t => ids.Contains(t.Id) && (t.IsActive || current.Contains(t.Id)), ct);
         if (valid != ids.Count) throw new BusinessRuleException("One of the selected treatments is no longer available.", field: "treatmentIds");
-        return TreatmentPlaceholder.Strip(ids, await TreatmentPlaceholder.IdsAsync(db, ct));
+        return ids;
     }
 
     private static string Describe(BookingStatus s) => s switch

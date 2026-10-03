@@ -302,8 +302,7 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
             && !await db.Users.AnyAsync(u => u.Id == assignee && (u.IsActive || u.Id == customer.AssignedUserId), ct))
             throw new BusinessRuleException("Choose an active user to assign.", field: "assignedUserId");
 
-        // "-" (not decided) is dropped when real treatments are chosen with it.
-        var treatmentIds = TreatmentPlaceholder.Strip(r.TreatmentIds ?? [], await TreatmentPlaceholder.IdsAsync(db, ct));
+        var treatmentIds = (r.TreatmentIds ?? []).Distinct().ToList();
         var current = customer.Treatments.Select(t => t.TreatmentId).ToHashSet();
         var validTreatments = await db.Treatments
             .Where(t => treatmentIds.Contains(t.Id) && (t.IsActive || current.Contains(t.Id)))
