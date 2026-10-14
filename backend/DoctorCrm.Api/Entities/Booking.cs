@@ -14,9 +14,13 @@ public enum BookingStatus
 /// deleted: cancelling, no-shows and rescheduling change the status, and a reschedule creates a
 /// new booking linked back through <see cref="OriginalBookingId"/>.
 /// </summary>
-public class Booking : AuditableEntity
+public class Booking : AuditableEntity, ISoftDeletable
 {
     public int Id { get; set; }
+
+    /// <summary>Set when deleted to the recycle bin (<see cref="ISoftDeletable"/>).</summary>
+    public DateTime? DeletedAt { get; set; }
+    public int? DeletedById { get; set; }
 
     public int CustomerId { get; set; }
     public Customer Customer { get; set; } = null!;
@@ -35,6 +39,15 @@ public class Booking : AuditableEntity
 
     /// <summary>Entered when the consultation is completed. Always 0 for a rescheduled booking.</summary>
     public decimal? ConsultationCharge { get; set; }
+
+    /// <summary>Total received so far (Paid entries). Kept in step by <see cref="Services.BookingMoney"/>.</summary>
+    public decimal AmountPaid { get; set; }
+
+    /// <summary>
+    /// Still owed on a completed consultation: charge − paid − waived, never below 0. What the
+    /// customer's outstanding adds up. Kept in step by <see cref="Services.BookingMoney"/>.
+    /// </summary>
+    public decimal Balance { get; set; }
 
     public string? DoctorNotes { get; set; }
 
@@ -78,10 +91,19 @@ public class BookingTreatment
     public Treatment Treatment { get; set; } = null!;
 }
 
+/// <summary>What a payment entry is.</summary>
 public enum PaymentStatus
 {
+    /// <summary>Money received: the whole balance or part of it.</summary>
     Paid,
+
+    /// <summary>
+    /// Entries made before part payments: "nothing received yet", carrying the full charge. No
+    /// longer created; ignored by balances and lists (what is owed is the booking's Balance).
+    /// </summary>
     Pending,
+
+    /// <summary>The remaining balance written off.</summary>
     Waived,
 }
 
@@ -89,9 +111,13 @@ public enum PaymentStatus
 /// A consultation payment (spec §28). The source of truth for payment state: bookings carry only
 /// the charge. Kept as separate rows so history stays traceable.
 /// </summary>
-public class Payment
+public class Payment : ISoftDeletable
 {
     public int Id { get; set; }
+
+    /// <summary>Set when deleted to the recycle bin (<see cref="ISoftDeletable"/>).</summary>
+    public DateTime? DeletedAt { get; set; }
+    public int? DeletedById { get; set; }
     public int BookingId { get; set; }
     public Booking Booking { get; set; } = null!;
     public int CustomerId { get; set; }

@@ -19,7 +19,7 @@ export interface Paged<T> {
   totalCount: number;
 }
 
-export type ConsultationState = "booked" | "consulted" | "missed" | "none";
+export type ConsultationState = "booked" | "rescheduled" | "consulted" | "missed" | "cancelled" | "none";
 
 /** Where the customer is with consultations, worked out from their bookings (backend ConsultationDto). */
 export interface Consultation {
@@ -43,6 +43,8 @@ export interface CustomerListItem {
   nextFollowUpDate: string | null;
   nextBooking: { id: number; date: string; startTime: string } | null;
   createdAt: string;
+  /** Still owed on completed consultations; null for users who can't see payments. */
+  outstanding: number | null;
 }
 
 /** string | number | boolean | number[], depending on the field type. */
@@ -76,6 +78,8 @@ export interface CustomerDetail {
   customFields: CustomerCustomField[];
   createdAt: string;
   updatedAt: string;
+  /** Still owed on completed consultations; null for users who can't see payments. */
+  outstanding: number | null;
   /** Follow-ups logged since the cycle last started. */
   followUpAttempts: number;
 }
@@ -121,5 +125,7 @@ export interface CustomerFilters {
   createdTo?: string;
   followUpFrom?: string;
   followUpTo?: string;
+  /** true: only customers who still owe money. */
+  hasOutstanding?: boolean;
   page?: number;
 }

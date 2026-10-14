@@ -15,14 +15,16 @@ import {
   Pencil,
   Phone,
   PhoneCall,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { BookingDetailsDrawer } from "@/components/bookings/booking-details-drawer";
 import { BookingFormDrawer } from "@/components/bookings/booking-form-drawer";
+import { formatMoney } from "@/components/bookings/booking-status";
 import { CustomerBookingsCard } from "@/components/customers/customer-bookings-card";
 import { CustomerPaymentsCard } from "@/components/customers/customer-payments-card";
 import { whatsAppUrl } from "@/components/customers/whatsapp-link";
@@ -32,10 +34,13 @@ import { ConsultationBadge } from "@/components/customers/consultation-badge";
 import { StageBadge } from "@/components/customers/stage-badge";
 import { RequirePermission } from "@/components/layout/require-permission";
 import { Button } from "@/components/ui/button";
+import { ConfirmDelete } from "@/components/ui/confirm-delete";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toastError } from "@/lib/api/admin";
+import { useLocale } from "@/lib/api/bookings";
+import { useDeleteRecord } from "@/lib/api/recycle-bin";
 import { ApiError } from "@/lib/api/client";
 import { describeActivity } from "@/components/activity/describe-activity";
 import { toSavePayload, useActiveLookup, useCustomer, useCustomerActivity, useSaveCustomer } from "@/lib/api/customers";
@@ -241,6 +246,7 @@ function ProfileHeader({
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 self-start">
+          <DeleteCustomer customer={customer} />
           {canManage && (
             <Button variant="secondary" onClick={onEdit}>
               <Pencil className="size-4" /> Edit
@@ -273,10 +279,52 @@ function ProfileHeader({
             <span className="font-medium">{customer.leadSource.name}</span>
           </span>
         )}
+        {!!customer.outstanding && <OwesPill amount={customer.outstanding} />}
         {customer.secondaryPhone && <ContactPill icon={Phone} label={customer.secondaryPhone} href={`tel:${customer.secondaryPhone.replace(/\s/g, "")}`} />}
         {customer.email && <ContactPill icon={Mail} label={customer.email} href={`mailto:${customer.email}`} />}
       </div>
     </Card>
+  );
+}
+
+/**
+ * To the recycle bin. The API refuses while the customer still has bookings, and says so; delete
+ * those first (lowest level first), or restore from Administration → Recycle Bin.
+ */
+function DeleteCustomer({ customer }: { customer: CustomerDetail }) {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const remove = useDeleteRecord("customer");
+  if (!can(session?.user, Permission.RecordsDelete)) return null;
+  return (
+    <ConfirmDelete
+      label="Delete"
+      what={customer.name}
+      pending={remove.isPending}
+      onConfirm={() =>
+        remove.mutate(customer.id, {
+          onSuccess: () => {
+            toast.success(`${customer.name} moved to the recycle bin`);
+            router.push("/customers");
+          },
+        })
+      }
+    />
+  );
+}
+
+/** What the customer still owes on completed consultations (shown to users who can see payments). */
+function OwesPill({ amount }: { amount: number }) {
+  const { data: locale } = useLocale();
+  return (
+    <span
+      className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm"
+      title="Still owed on completed consultations. See Payments below."
+    >
+      <Wallet className="size-4 text-amber-600" />
+      <span className="text-amber-800/80">Owes</span>
+      <span className="font-semibold text-amber-800">{formatMoney(amount, locale?.currency)}</span>
+    </span>
   );
 }
 

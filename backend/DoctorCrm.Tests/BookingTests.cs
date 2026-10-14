@@ -39,7 +39,7 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         var treatments = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/treatments"));
         var n = Interlocked.Increment(ref _seq);
         var customer = await DataAsync<CustomerDetailDto>(await admin.PostAsJsonAsync("/api/customers",
-            new SaveCustomerRequest($"Booking Customer {n}", $"052 {n + 2000000:0000000}", null, null, null, null, null, null,
+            new SaveCustomerRequest($"Booking Customer {n}", $"052 {n + 2000000:0000000}", null, null, null, null, 1, null,
                 [treatments[0].Id], null, null, null, null)));
         return (customer, treatments);
     }
@@ -117,7 +117,7 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         var methods = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/payment-methods"));
 
         // The next treatment gets booked: on a day no other test books on.
-        var request = new CompleteBookingRequest(250, "Paid", methods[0].Id,
+        var request = new CompleteBookingRequest(250, 250, methods[0].Id,
             withDate ? NewDay() : null, withTreatment ? treatments[1].Id : null, null, NextTreatmentStartTime: withDate ? T(10) : null);
         var response = await admin.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete", request);
 
@@ -144,7 +144,7 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
 
         // A date needs a time.
         var noTime = await admin.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
-            new CompleteBookingRequest(300, "Paid", methods[0].Id, nextDay, treatments[1].Id, null));
+            new CompleteBookingRequest(300, 300, methods[0].Id, nextDay, treatments[1].Id, null));
         Assert.Contains("nextTreatmentStartTime", await noTime.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.BadRequest, noTime.StatusCode);
 
@@ -152,14 +152,14 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         var other = (await NewCustomerAsync(admin)).Customer;
         await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings", Book(other.Id, nextDay, T(10), T(10, 30), [treatments[0].Id])));
         var clash = await admin.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
-            new CompleteBookingRequest(300, "Paid", methods[0].Id, nextDay, treatments[1].Id, null, NextTreatmentStartTime: T(10, 15)));
+            new CompleteBookingRequest(300, 300, methods[0].Id, nextDay, treatments[1].Id, null, NextTreatmentStartTime: T(10, 15)));
         Assert.Equal(HttpStatusCode.Conflict, clash.StatusCode);
         Assert.Contains("Next treatment:", await clash.Content.ReadAsStringAsync());
         Assert.Equal("Booked", (await DataAsync<BookingDetailDto>(await admin.GetAsync($"/api/bookings/{booking.Id}"))).Status);
 
         // Booked: same length as the consultation, the chosen treatment, linked, and on the calendar.
         var done = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
-            new CompleteBookingRequest(300, "Paid", methods[0].Id, nextDay, treatments[1].Id, null, NextTreatmentStartTime: T(14))));
+            new CompleteBookingRequest(300, 300, methods[0].Id, nextDay, treatments[1].Id, null, NextTreatmentStartTime: T(14))));
         Assert.True(done.NextTreatmentBooked);
         var link = done.NextBooking!;
         Assert.Equal((nextDay, T(14), "Booked"), (link.Date, link.StartTime, link.Status));
@@ -181,12 +181,12 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
 
         // Paid needs a method.
         await FailAsync(await admin.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
-            new CompleteBookingRequest(300, "Paid", null, null, null, null)), HttpStatusCode.BadRequest);
+            new CompleteBookingRequest(300, 300, null, null, null, null)), HttpStatusCode.BadRequest);
         await FailAsync(await admin.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
-            new CompleteBookingRequest(-5, "Waived", null, null, null, null)), HttpStatusCode.BadRequest);
+            new CompleteBookingRequest(-5, 0, null, null, null, null)), HttpStatusCode.BadRequest);
 
         var done = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
-            new CompleteBookingRequest(300, "Paid", methods[0].Id, null, null, "Good candidate")));
+            new CompleteBookingRequest(300, 300, methods[0].Id, null, null, "Good candidate")));
         Assert.Equal("Completed", done.Status);
         Assert.Equal(300, done.ConsultationCharge);
         var payment = Assert.Single(done.Payments);
@@ -196,7 +196,7 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
 
         // A completed consultation is final.
         await FailAsync(await admin.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
-            new CompleteBookingRequest(300, "Paid", methods[0].Id, null, null, null)), HttpStatusCode.Conflict);
+            new CompleteBookingRequest(300, 300, methods[0].Id, null, null, null)), HttpStatusCode.Conflict);
         await FailAsync(await admin.PostAsJsonAsync($"/api/bookings/{booking.Id}/reschedule",
             new RescheduleBookingRequest(NewDay(), T(9), T(9, 30), null)), HttpStatusCode.Conflict);
     }
@@ -276,10 +276,10 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
 
         var paid = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings", Book(customer.Id, day, T(9), T(9, 30), [treatments[0].Id])));
         await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{paid.Id}/complete",
-            new CompleteBookingRequest(400, "Paid", methods[0].Id, null, null, null)));
+            new CompleteBookingRequest(400, 400, methods[0].Id, null, null, null)));
         var pending = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings", Book(customer.Id, day, T(10), T(10, 30), [treatments[1].Id])));
         await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{pending.Id}/complete",
-            new CompleteBookingRequest(150, "Pending", null, null, null, null)));
+            new CompleteBookingRequest(150, 0, null, null, null, null)));
 
         var range = $"from={day:yyyy-MM-dd}&to={day:yyyy-MM-dd}";
         var byPayment = await DataAsync<PagedResult<BookingListItemDto>>(await admin.GetAsync($"/api/bookings?{range}&paymentStatus=Paid"));
@@ -317,7 +317,7 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
     }
 
     [Fact]
-    public async Task Staff_can_view_bookings_but_not_book_or_complete()
+    public async Task Staff_can_view_and_complete_bookings_but_not_book()
     {
         var admin = await AdminAsync();
         var (customer, treatments) = await NewCustomerAsync(admin);
@@ -333,8 +333,8 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync($"/api/bookings/{booking.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsJsonAsync("/api/bookings",
             Book(customer.Id, NewDay(), T(9), T(9, 30), [treatments[0].Id]))).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
-            new CompleteBookingRequest(0, "Waived", null, null, null, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await staff.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
+            new CompleteBookingRequest(0, 0, null, null, null, null))).StatusCode);
     }
 
     // ---- Status and the consultation column ------------------------------------------------------
@@ -359,20 +359,24 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         var reason = (await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/cancellation-reasons")))[0].Id;
         await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{first.Id}/cancel", new CancelBookingRequest(reason, null)));
         c = await CustomerAsync(admin, customer.Id);
-        Assert.Equal("missed", c.Consultation.State);
+        Assert.Equal("cancelled", c.Consultation.State);
         Assert.Equal("interested", c.Stage.SystemKey);
 
-        // Rescheduled bookings don't count; their replacement does.
+        // The rescheduled booking doesn't count; its replacement does, shown as rescheduled.
         var second = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings", Book(customer.Id, day.AddDays(1), T(9), T(9, 30), [treatments[0].Id])));
         var moved = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{second.Id}/reschedule",
             new RescheduleBookingRequest(day.AddDays(2), T(10), T(10, 30), null)));
         c = await CustomerAsync(admin, customer.Id);
-        Assert.Equal("booked", c.Consultation.State);
+        Assert.Equal("rescheduled", c.Consultation.State);
         Assert.Equal(moved.Id, c.Consultation.BookingId);
+        var rescheduled = await DataAsync<PagedResult<CustomerListItemDto>>(await admin.GetAsync($"/api/customers?consultation=rescheduled&pageSize=100&search={Uri.EscapeDataString(customer.Name)}"));
+        Assert.Equal("rescheduled", Assert.Single(rescheduled.Items).Consultation.State);
+        var booked = await DataAsync<PagedResult<CustomerListItemDto>>(await admin.GetAsync($"/api/customers?consultation=booked&pageSize=100&search={Uri.EscapeDataString(customer.Name)}"));
+        Assert.Empty(booked.Items);
 
         var methods = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/payment-methods"));
         await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{moved.Id}/complete",
-            new CompleteBookingRequest(200, "Paid", methods[0].Id, null, null, null)));
+            new CompleteBookingRequest(200, 200, methods[0].Id, null, null, null)));
         c = await CustomerAsync(admin, customer.Id);
         Assert.Equal("consulted", c.Consultation.State);
         Assert.Equal("customer", c.Stage.SystemKey);
@@ -382,6 +386,8 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal("consulted", Assert.Single(consulted.Items).Consultation.State);
         var missed = await DataAsync<PagedResult<CustomerListItemDto>>(await admin.GetAsync($"/api/customers?consultation=missed&pageSize=100&search={Uri.EscapeDataString(customer.Name)}"));
         Assert.Empty(missed.Items);
+        var cancelled = await DataAsync<PagedResult<CustomerListItemDto>>(await admin.GetAsync($"/api/customers?consultation=cancelled&pageSize=100&search={Uri.EscapeDataString(customer.Name)}"));
+        Assert.Empty(cancelled.Items);
     }
 
     [Fact]
@@ -392,13 +398,13 @@ public class BookingIntegrationTests(ApiFactory factory) : IClassFixture<ApiFact
         var stages = await DataAsync<List<LookupItemDto>>(await admin.GetAsync("/api/stages"));
         var lost = stages.Single(x => x.SystemKey == "lost").Id;
         (await admin.PutAsJsonAsync($"/api/customers/{customer.Id}", new SaveCustomerRequest(customer.Name, customer.WhatsApp, null, null, null,
-            lost, null, null, [treatments[0].Id], null, null, null, null))).EnsureSuccessStatusCode();
+            lost, 1, null, [treatments[0].Id], null, null, null, null))).EnsureSuccessStatusCode();
 
         var booking = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings", Book(customer.Id, NewDay(), T(11), T(11, 30), [treatments[0].Id])));
         Assert.Equal("lost", (await CustomerAsync(admin, customer.Id)).Stage.SystemKey);
 
         await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{booking.Id}/complete",
-            new CompleteBookingRequest(0, "Waived", null, null, null, null)));
+            new CompleteBookingRequest(0, 0, null, null, null, null)));
         Assert.Equal("customer", (await CustomerAsync(admin, customer.Id)).Stage.SystemKey);
     }
 

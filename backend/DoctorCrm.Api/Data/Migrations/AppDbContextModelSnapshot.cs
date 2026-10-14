@@ -84,6 +84,16 @@ namespace DoctorCrm.Api.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal>("AmountPaid")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount_paid");
+
+                    b.Property<decimal>("Balance")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("balance");
+
                     b.Property<DateOnly>("BookingDate")
                         .HasColumnType("date")
                         .HasColumnName("booking_date");
@@ -121,6 +131,14 @@ namespace DoctorCrm.Api.Data.Migrations
                     b.Property<int>("CustomerId")
                         .HasColumnType("integer")
                         .HasColumnName("customer_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int?>("DeletedById")
+                        .HasColumnType("integer")
+                        .HasColumnName("deleted_by_id");
 
                     b.Property<int?>("DoctorId")
                         .HasColumnType("integer")
@@ -206,6 +224,10 @@ namespace DoctorCrm.Api.Data.Migrations
 
                     b.HasIndex("BookingDate", "StartTime")
                         .HasDatabaseName("ix_bookings_booking_date_start_time");
+
+                    b.HasIndex("CustomerId", "Balance")
+                        .HasDatabaseName("ix_bookings_customer_id_balance")
+                        .HasFilter("balance > 0");
 
                     b.HasIndex("DoctorId", "BookingDate")
                         .HasDatabaseName("ix_bookings_doctor_id_booking_date");
@@ -309,6 +331,14 @@ namespace DoctorCrm.Api.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int?>("DeletedById")
+                        .HasColumnType("integer")
+                        .HasColumnName("deleted_by_id");
 
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer")
@@ -569,6 +599,14 @@ namespace DoctorCrm.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int?>("DeletedById")
+                        .HasColumnType("integer")
+                        .HasColumnName("deleted_by_id");
+
                     b.Property<string>("Email")
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)")
@@ -644,7 +682,7 @@ namespace DoctorCrm.Api.Data.Migrations
                     b.HasIndex("InstagramName")
                         .IsUnique()
                         .HasDatabaseName("ix_customers_instagram_name")
-                        .HasFilter("instagram_name IS NOT NULL");
+                        .HasFilter("instagram_name IS NOT NULL AND deleted_at IS NULL");
 
                     b.HasIndex("LeadSourceId")
                         .HasDatabaseName("ix_customers_lead_source_id");
@@ -658,7 +696,7 @@ namespace DoctorCrm.Api.Data.Migrations
                     b.HasIndex("WhatsAppNumber")
                         .IsUnique()
                         .HasDatabaseName("ix_customers_whats_app_number")
-                        .HasFilter("whats_app_number IS NOT NULL");
+                        .HasFilter("whats_app_number IS NOT NULL AND deleted_at IS NULL");
 
                     b.ToTable("customers", (string)null);
                 });
@@ -728,6 +766,14 @@ namespace DoctorCrm.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int?>("DeletedById")
+                        .HasColumnType("integer")
+                        .HasColumnName("deleted_by_id");
+
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer")
                         .HasColumnName("display_order");
@@ -742,6 +788,11 @@ namespace DoctorCrm.Api.Data.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
+                    b.Property<string>("SystemKey")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("system_key");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -751,6 +802,11 @@ namespace DoctorCrm.Api.Data.Migrations
 
                     b.HasIndex("DisplayOrder")
                         .HasDatabaseName("ix_lead_sources_display_order");
+
+                    b.HasIndex("SystemKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_lead_sources_system_key")
+                        .HasFilter("system_key IS NOT NULL");
 
                     b.ToTable("lead_sources", (string)null);
                 });
@@ -784,6 +840,14 @@ namespace DoctorCrm.Api.Data.Migrations
                     b.Property<int>("CustomerId")
                         .HasColumnType("integer")
                         .HasColumnName("customer_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int?>("DeletedById")
+                        .HasColumnType("integer")
+                        .HasColumnName("deleted_by_id");
 
                     b.Property<DateTime?>("PaymentDate")
                         .HasColumnType("timestamp with time zone")
@@ -832,6 +896,14 @@ namespace DoctorCrm.Api.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int?>("DeletedById")
+                        .HasColumnType("integer")
+                        .HasColumnName("deleted_by_id");
 
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer")
@@ -958,6 +1030,14 @@ namespace DoctorCrm.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int?>("DeletedById")
+                        .HasColumnType("integer")
+                        .HasColumnName("deleted_by_id");
+
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer")
                         .HasColumnName("display_order");
@@ -1030,6 +1110,14 @@ namespace DoctorCrm.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int?>("DeletedById")
+                        .HasColumnType("integer")
+                        .HasColumnName("deleted_by_id");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
@@ -1061,7 +1149,8 @@ namespace DoctorCrm.Api.Data.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("ix_treatments_name");
+                        .HasDatabaseName("ix_treatments_name")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("treatments", (string)null);
                 });

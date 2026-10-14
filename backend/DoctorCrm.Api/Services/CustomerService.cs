@@ -51,6 +51,8 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
         }
         if (q.FollowUpFrom is { } ff) query = query.Where(c => c.NextFollowUpDate >= ff);
         if (q.FollowUpTo is { } ft) query = query.Where(c => c.NextFollowUpDate <= ft);
+        if (q.HasOutstanding is { } owes)
+            query = query.Where(c => db.Bookings.Any(b => b.CustomerId == c.Id && b.Balance > 0) == owes);
 
         var total = await query.CountAsync(ct);
         var today = await clock.TodayAsync(ct);
@@ -70,6 +72,7 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
                 AssignedUser = c.AssignedUser != null ? c.AssignedUser.FullName : null,
                 c.NextFollowUpDate,
                 c.CreatedAt,
+                Outstanding = db.Bookings.Where(b => b.CustomerId == c.Id).Sum(b => b.Balance),
                 NextBooking = db.Bookings
                     .Where(b => b.CustomerId == c.Id && b.Status == BookingStatus.Booked && b.BookingDate >= today)
                     .OrderBy(b => b.BookingDate).ThenBy(b => b.StartTime)
@@ -82,7 +85,7 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
         var consultations = await ConsultationsAsync(rows.Select(r => r.Id).ToList(), ct);
         var items = rows.Select(r => new CustomerListItemDto(
             r.Id, r.Name, Phone(r.WhatsAppNumber), r.InstagramName, r.Stage, consultations[r.Id], r.Treatments,
-            r.LeadSource, r.AssignedUser, r.NextFollowUpDate, r.NextBooking, r.CreatedAt)).ToList();
+            r.LeadSource, r.AssignedUser, r.NextFollowUpDate, r.NextBooking, r.CreatedAt, r.Outstanding)).ToList();
         return new PagedResult<CustomerListItemDto>(items, page, size, total);
     }
 
@@ -95,7 +98,7 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
     {
         var bookings = await db.Bookings.AsNoTracking()
             .Where(b => customerIds.Contains(b.CustomerId) && b.Status != BookingStatus.Rescheduled)
-            .Select(b => new { b.CustomerId, b.Id, b.Status, b.BookingDate, b.StartTime, b.NextTreatmentDate })
+            .Select(b => new { b.CustomerId, b.Id, b.Status, b.BookingDate, b.StartTime, b.NextTreatmentDate, b.OriginalBookingId })
             .ToListAsync(ct);
 
         var result = new Dictionary<int, ConsultationDto>();
@@ -103,17 +106,21 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
         {
             var mine = bookings.Where(b => b.CustomerId == id).ToList();
             var booked = mine.Where(b => b.Status == BookingStatus.Booked)
-                .OrderBy(b => b.BookingDate).ThenBy(b => b.StartTime).FirstOrDefault();
+                .OrderBy(b => b.BookingDate).ThenBy(b => b.StartTime).ThenBy(b => b.Id).FirstOrDefault();
             var last = mine.Where(b => Finished.Contains(b.Status))
                 .OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.StartTime).ThenByDescending(b => b.Id).FirstOrDefault();
 
             result[id] = booked is not null
-                ? new ConsultationDto(ConsultationStates.Booked, booked.Id, booked.BookingDate, booked.StartTime, null)
+                ? new ConsultationDto(booked.OriginalBookingId is null ? ConsultationStates.Booked : ConsultationStates.Rescheduled,
+                    booked.Id, booked.BookingDate, booked.StartTime, null)
                 : last is null
                     ? new ConsultationDto(ConsultationStates.None, null, null, null, null)
-                    : last.Status == BookingStatus.Completed
-                        ? new ConsultationDto(ConsultationStates.Consulted, last.Id, last.BookingDate, last.StartTime, last.NextTreatmentDate)
-                        : new ConsultationDto(ConsultationStates.Missed, last.Id, last.BookingDate, last.StartTime, null);
+                    : last.Status switch
+                    {
+                        BookingStatus.Completed => new ConsultationDto(ConsultationStates.Consulted, last.Id, last.BookingDate, last.StartTime, last.NextTreatmentDate),
+                        BookingStatus.Cancelled => new ConsultationDto(ConsultationStates.Cancelled, last.Id, last.BookingDate, last.StartTime, null),
+                        _ => new ConsultationDto(ConsultationStates.Missed, last.Id, last.BookingDate, last.StartTime, null),
+                    };
         }
         return result;
     }
@@ -124,23 +131,30 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
         var bookings = db.Bookings;
         return state?.Trim().ToLowerInvariant() switch
         {
-            ConsultationStates.Booked => query.Where(c => bookings.Any(b => b.CustomerId == c.Id && b.Status == BookingStatus.Booked)),
+            // Booked vs rescheduled: whether the earliest booked consultation replaced a rescheduled one.
+            ConsultationStates.Booked => query.Where(c => bookings.Where(b => b.CustomerId == c.Id && b.Status == BookingStatus.Booked)
+                .OrderBy(b => b.BookingDate).ThenBy(b => b.StartTime).ThenBy(b => b.Id)
+                .Select(b => (bool?)(b.OriginalBookingId == null)).FirstOrDefault() == true),
+            ConsultationStates.Rescheduled => query.Where(c => bookings.Where(b => b.CustomerId == c.Id && b.Status == BookingStatus.Booked)
+                .OrderBy(b => b.BookingDate).ThenBy(b => b.StartTime).ThenBy(b => b.Id)
+                .Select(b => (bool?)(b.OriginalBookingId == null)).FirstOrDefault() == false),
             ConsultationStates.None => query.Where(c => !bookings.Any(b => b.CustomerId == c.Id && b.Status != BookingStatus.Rescheduled)),
-            ConsultationStates.Consulted => query.Where(c =>
-                !bookings.Any(b => b.CustomerId == c.Id && b.Status == BookingStatus.Booked)
-                && bookings.Where(b => b.CustomerId == c.Id && Finished.Contains(b.Status))
-                    .OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.StartTime).ThenByDescending(b => b.Id)
-                    .Select(b => (BookingStatus?)b.Status).FirstOrDefault() == BookingStatus.Completed),
-            ConsultationStates.Missed => query.Where(c =>
-                !bookings.Any(b => b.CustomerId == c.Id && b.Status == BookingStatus.Booked)
-                && (bookings.Where(b => b.CustomerId == c.Id && Finished.Contains(b.Status))
-                        .OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.StartTime).ThenByDescending(b => b.Id)
-                        .Select(b => (BookingStatus?)b.Status).FirstOrDefault() == BookingStatus.Cancelled
-                    || bookings.Where(b => b.CustomerId == c.Id && Finished.Contains(b.Status))
-                        .OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.StartTime).ThenByDescending(b => b.Id)
-                        .Select(b => (BookingStatus?)b.Status).FirstOrDefault() == BookingStatus.NoShow)),
+            ConsultationStates.Consulted => LastFinished(query, BookingStatus.Completed),
+            ConsultationStates.Cancelled => LastFinished(query, BookingStatus.Cancelled),
+            ConsultationStates.Missed => LastFinished(query, BookingStatus.NoShow),
             _ => query,
         };
+    }
+
+    /// <summary>Customers with nothing booked whose latest finished consultation ended with <paramref name="status"/>.</summary>
+    private IQueryable<Customer> LastFinished(IQueryable<Customer> query, BookingStatus status)
+    {
+        var bookings = db.Bookings;
+        return query.Where(c =>
+            !bookings.Any(b => b.CustomerId == c.Id && b.Status == BookingStatus.Booked)
+            && bookings.Where(b => b.CustomerId == c.Id && Finished.Contains(b.Status))
+                .OrderByDescending(b => b.BookingDate).ThenByDescending(b => b.StartTime).ThenByDescending(b => b.Id)
+                .Select(b => (BookingStatus?)b.Status).FirstOrDefault() == status);
     }
 
     public async Task<CustomerDetailDto> GetAsync(int id, CancellationToken ct)
@@ -174,7 +188,9 @@ public class CustomerService(AppDbContext db, AuditService audit, ContactNormali
             c.AssignedUser is null ? null : new NamedRef(c.AssignedUser.Id, c.AssignedUser.FullName),
             c.LastContactDate, c.NextFollowUpDate, c.Notes, c.IsActive,
             c.Treatments.OrderBy(t => t.Treatment.DisplayOrder).Select(t => new NamedRef(t.TreatmentId, t.Treatment.Name)).ToList(),
-            customFields, c.CreatedAt, c.UpdatedAt, c.FollowUpAttempts);
+            customFields, c.CreatedAt, c.UpdatedAt,
+            await db.Bookings.Where(b => b.CustomerId == c.Id).SumAsync(b => b.Balance, ct),
+            c.FollowUpAttempts);
     }
 
     public async Task<CustomerDetailDto> CreateAsync(SaveCustomerRequest request, int? userId, CancellationToken ct)

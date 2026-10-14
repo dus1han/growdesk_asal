@@ -6,6 +6,8 @@ import {
   Layers,
   Megaphone,
   PanelTop,
+  ScrollText,
+  Trash2,
   Sparkles,
   UserCog,
   Wallet,
@@ -32,4 +34,6 @@ export const ADMIN_SECTIONS: AdminSection[] = [
   { href: "/administration/whatsapp-bot", title: "WhatsApp BOT", description: "Opening hours and the bot's connection for leads and bookings", icon: Bot, permission: Permission.SettingsManage },
   { href: "/administration/cancellation-reasons", title: "Cancellation Reasons", description: "Reasons offered when cancelling a booking", icon: Ban, permission: Permission.SettingsManage },
   { href: "/administration/payment-methods", title: "Payment Methods", description: "Cash, card, bank transfer and others", icon: Wallet, permission: Permission.SettingsManage },
+  { href: "/administration/recycle-bin", title: "Recycle Bin", description: "Deleted customers, bookings, payments and list items: restore them", icon: Trash2, permission: Permission.RecordsDelete },
+  { href: "/administration/audit-log", title: "Audit Log", description: "Who did what and when: sign-ins, changes and settings", icon: ScrollText, permission: Permission.AuditView },
 ];

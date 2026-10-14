@@ -131,7 +131,7 @@ public class FollowUpTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var visit = await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync("/api/bookings",
             new CreateBookingRequest(customer.Id, null, Today, new TimeOnly(8, 0), new TimeOnly(8, 30), [treatments[0].Id], null)));
         await DataAsync<BookingDetailDto>(await admin.PostAsJsonAsync($"/api/bookings/{visit.Id}/complete",
-            new CompleteBookingRequest(100, "Paid", methods[0].Id, null, null, null)));
+            new CompleteBookingRequest(100, 100, methods[0].Id, null, null, null)));
 
         // As saved before next treatments were booked automatically: a date and a treatment, no booking.
         using (var scope = factory.Services.CreateScope())
@@ -185,7 +185,7 @@ public class FollowUpTests(ApiFactory factory) : IClassFixture<ApiFactory>
         tool.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
 
         var number = Number();
-        var lead = new CaptureCustomerRequest("Captured Lead", number, null, null, null, null, null, null, null, null);
+        var lead = new CaptureCustomerRequest("Captured Lead", number, null, null, null, null, null, null, null, null, "whatsapp");
         var first = await DataAsync<CaptureCustomerResultDto>(await tool.PostAsJsonAsync("/api/capture/customers", lead));
         Assert.Equal(Today, (await CustomerAsync(admin, first.CustomerId)).NextFollowUpDate);
 

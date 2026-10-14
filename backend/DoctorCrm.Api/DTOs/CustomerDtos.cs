@@ -11,8 +11,9 @@ public record StageRef(int Id, string Name, string Color, string? SystemKey);
 /// <summary>
 /// Where the customer is with consultations, worked out from their bookings every time (never
 /// stored, so it can't go stale or be set wrongly). <c>State</c>: "booked" (a consultation is
-/// booked: the earliest one), "consulted" (the last one was completed), "missed" (the last one was
-/// cancelled or a no-show, and nothing is booked) or "none" (never booked). The booking fields
+/// booked: the earliest one), "rescheduled" (the same, but that booking replaced a rescheduled
+/// one), "consulted" (the last one was completed), "missed" (the last one was a no-show),
+/// "cancelled" (the last one was cancelled), or "none" (never booked). The booking fields
 /// describe that consultation; <c>NextTreatmentDate</c> is set on a completed one.
 /// </summary>
 public record ConsultationDto(string State, int? BookingId, DateOnly? Date, TimeOnly? StartTime, DateOnly? NextTreatmentDate);
@@ -20,8 +21,10 @@ public record ConsultationDto(string State, int? BookingId, DateOnly? Date, Time
 public static class ConsultationStates
 {
     public const string Booked = "booked";
+    public const string Rescheduled = "rescheduled";
     public const string Consulted = "consulted";
     public const string Missed = "missed";
+    public const string Cancelled = "cancelled";
     public const string None = "none";
 }
 
@@ -30,7 +33,7 @@ public class CustomerQuery
 {
     public string? Search { get; set; }
     public int? StageId { get; set; }
-    /// <summary>booked, consulted, missed or none (see ConsultationDto).</summary>
+    /// <summary>booked, rescheduled, consulted, missed, cancelled or none (see ConsultationDto).</summary>
     public string? Consultation { get; set; }
     public int? TreatmentId { get; set; }
     public int? LeadSourceId { get; set; }
@@ -39,6 +42,8 @@ public class CustomerQuery
     public DateOnly? CreatedTo { get; set; }
     public DateOnly? FollowUpFrom { get; set; }
     public DateOnly? FollowUpTo { get; set; }
+    /// <summary>true: only customers who still owe money on a completed consultation.</summary>
+    public bool? HasOutstanding { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 20;
 }
@@ -55,7 +60,9 @@ public record CustomerListItemDto(
     string? AssignedUser,
     DateOnly? NextFollowUpDate,
     NextBookingDto? NextBooking,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    /// <summary>Total still owed on completed consultations; null for users who can't see payments.</summary>
+    decimal? Outstanding);
 
 public record NextBookingDto(int Id, DateOnly Date, TimeOnly StartTime);
 
@@ -84,6 +91,8 @@ public record CustomerDetailDto(
     IReadOnlyList<CustomFieldValueDto> CustomFields,
     DateTime CreatedAt,
     DateTime UpdatedAt,
+    /// <summary>Total still owed on completed consultations; null for users who can't see payments.</summary>
+    decimal? Outstanding,
     /// <summary>Follow-ups logged since the cycle last started.</summary>
     int FollowUpAttempts = 0);
 

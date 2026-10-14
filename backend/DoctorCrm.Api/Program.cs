@@ -66,15 +66,31 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
                 return Task.CompletedTask;
             },
             // A deactivated user loses access on their next request, not when the token expires.
+            // Permissions are read fresh too, so a permission added in a release or a role change
+            // applies at once instead of after signing in again (the sidebar, fed by /me, already does).
             OnTokenValidated = async ctx =>
             {
                 var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
                 // No cancellation token: an aborted request must not be mistaken for a failed check.
                 var state = int.TryParse(ctx.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out var id)
-                    ? await db.Users.Where(u => u.Id == id && u.IsActive).Select(u => new { u.MustChangePassword }).SingleOrDefaultAsync()
+                    ? await db.Users.AsNoTracking().AsSplitQuery().Where(u => u.Id == id && u.IsActive).Select(u => new
+                    {
+                        u.MustChangePassword,
+                        Permissions = u.UserRoles.SelectMany(ur => ur.Role.RolePermissions).Select(rp => rp.Permission.Key).Distinct().ToList(),
+                    }).SingleOrDefaultAsync()
                     : null;
-                if (state is null) ctx.Fail("User is inactive or no longer exists.");
-                else if (state.MustChangePassword) PasswordChangeGate.Flag(ctx.HttpContext);
+                if (state is null)
+                {
+                    ctx.Fail("User is inactive or no longer exists.");
+                    return;
+                }
+                if (state.MustChangePassword) PasswordChangeGate.Flag(ctx.HttpContext);
+
+                if (ctx.Principal!.Identity is ClaimsIdentity identity)
+                {
+                    foreach (var stale in identity.FindAll(CrmClaims.Permission).ToList()) identity.RemoveClaim(stale);
+                    identity.AddClaims(state.Permissions.Select(p => new Claim(CrmClaims.Permission, p)));
+                }
             },
             OnChallenge = async ctx =>
             {
@@ -199,6 +215,8 @@ builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<StageAutomation>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<FollowUpService>();
+builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<RecycleBinService>();
 builder.Services.AddScoped<BookingExportService>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<DashboardService>();
