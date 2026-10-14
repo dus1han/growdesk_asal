@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PASSWORD_CHANGE_EVENT, UNAUTHORIZED_EVENT } from "@/lib/api/client";
 import { sessionQueryKey, useSession } from "@/lib/auth/session";
 import { can, Permission } from "@/lib/permissions";
+import { FollowUpAlerts } from "@/components/follow-ups/follow-up-alerts";
 import { LiveBookings } from "./live-bookings";
 import { MobileNav } from "./mobile-nav";
 import { Sidebar } from "./sidebar";
@@ -103,6 +104,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </motion.main>
       </div>
       {can(session.user, Permission.BookingsView) && <LiveBookings />}
+      {can(session.user, Permission.CustomersView) && <FollowUpAlerts />}
     </div>
   );
 }

@@ -83,7 +83,9 @@ public record CustomerDetailDto(
     IReadOnlyList<NamedRef> Treatments,
     IReadOnlyList<CustomFieldValueDto> CustomFields,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    /// <summary>Follow-ups logged since the cycle last started.</summary>
+    int FollowUpAttempts = 0);
 
 public record SaveCustomerRequest(
     string Name,

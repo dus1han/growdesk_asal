@@ -198,6 +198,7 @@ builder.Services.AddScoped<ClinicClock>();
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<StageAutomation>();
 builder.Services.AddScoped<BookingService>();
+builder.Services.AddScoped<FollowUpService>();
 builder.Services.AddScoped<BookingExportService>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<DashboardService>();

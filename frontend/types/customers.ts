@@ -76,6 +76,8 @@ export interface CustomerDetail {
   customFields: CustomerCustomField[];
   createdAt: string;
   updatedAt: string;
+  /** Follow-ups logged since the cycle last started. */
+  followUpAttempts: number;
 }
 
 export interface SaveCustomer {
