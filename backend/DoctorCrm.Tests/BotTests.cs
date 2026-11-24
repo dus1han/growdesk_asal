@@ -395,12 +395,8 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var known = await DataAsync<BotMessageResultDto>(await bot.PostAsJsonAsync("/api/bot/messages", new BotMessageRequest(number)));
         Assert.Equal("Messaging Customer", known.CustomerName);
-        Assert.True(known.Alerted);
-        // More messages in the same conversation don't alert again.
-        Assert.False((await DataAsync<BotMessageResultDto>(await bot.PostAsJsonAsync("/api/bot/messages", new BotMessageRequest(number)))).Alerted);
         var unknown = await DataAsync<BotMessageResultDto>(await bot.PostAsJsonAsync("/api/bot/messages", new BotMessageRequest(Number())));
         Assert.Null(unknown.CustomerId);
-        Assert.True(unknown.Alerted);
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var events = new List<JsonElement>();
@@ -419,7 +415,6 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal("Messaging Customer", events[0].GetProperty("customerName").GetString());
         Assert.StartsWith("+971 50", events[0].GetProperty("whatsApp").GetString());
         Assert.False(events[0].TryGetProperty("text", out _));
-        // The second event is the other number's: the repeat message sent nothing.
         Assert.Equal(JsonValueKind.Null, events[1].GetProperty("customerName").ValueKind);
 
         Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/messages", new BotMessageRequest("not a number"))).StatusCode);

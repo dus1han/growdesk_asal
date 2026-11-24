@@ -45,9 +45,6 @@ interface MessageCard extends LiveMessageEvent {
   stamp: number;
 }
 
-/** A sender writing several messages in a row chimes once, not once per message. */
-const MESSAGE_CHIME_GAP_MS = 30_000;
-
 const EVENT_TYPES = ["booking.created", "booking.rescheduled", "booking.cancelled", "booking.updated"] as const;
 const SHOW_MS = 10_000;
 const MAX_CARDS = 3;
@@ -108,7 +105,6 @@ export function LiveBookings() {
       }
     };
 
-    const lastChime = new Map<string, number>();
     const onMessage = (e: MessageEvent<string>) => {
       let evt: LiveMessageEvent;
       try {
@@ -122,9 +118,6 @@ export function LiveBookings() {
         return [card, ...c.filter((x) => x.whatsApp !== evt.whatsApp)].slice(0, MAX_CARDS);
       });
       if (document.visibilityState !== "visible") setUnseen((n) => n + 1);
-      const now = Date.now();
-      if (now - (lastChime.get(evt.whatsApp) ?? 0) < MESSAGE_CHIME_GAP_MS) return;
-      lastChime.set(evt.whatsApp, now);
       playChime();
       const from = evt.customerName ? `${evt.customerName} · ${evt.whatsApp}` : evt.whatsApp;
       showDesktopAlert(`New WhatsApp message · ${evt.source}`, from, () => {});

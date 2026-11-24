@@ -427,7 +427,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "data": { "customerId": 1052, "customerName": "Sarah Fernando", "alerted": true },
+  "data": { "customerId": 1052, "customerName": "Sarah Fernando" },
   "message": null,
   "errors": null
 }
@@ -442,7 +442,7 @@ Content-Type: application/json
 Notes:
 
 - The alert only reaches screens that are open at that moment. It is not kept for later.
-- Call this for every message. The clinic is alerted once per conversation: on the first message, and again only after the number has been quiet for 30 minutes. `alerted` says whether this call raised an alert.
+- Several messages in a row from the same number show as one card with a count, so you can call this for every message.
 - Don't wait for this call before replying to the customer. If it fails, carry on with the conversation.
 
 ## 12. A typical conversation
