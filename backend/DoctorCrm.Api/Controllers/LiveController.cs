@@ -11,7 +11,8 @@ namespace DoctorCrm.Api.Controllers;
 
 /// <summary>
 /// Live updates for open GrowDesk screens as Server-Sent Events: one long-lived response per tab
-/// that the server writes an event to the moment the WhatsApp BOT books or moves a consultation.
+/// that the server writes an event to the moment the WhatsApp BOT books or moves a consultation,
+/// or receives a WhatsApp message. Only bookings are caught up on after a reconnect.
 /// It runs over plain HTTP through the Next.js server, signed in with the normal session cookie.
 /// </summary>
 [ApiController]
@@ -69,7 +70,7 @@ public class LiveController(LiveEvents live, AppDbContext db, IHostApplicationLi
                 {
                     var e = await reader.ReadAsync(wait.Token);
                     // Already sent during the catch-up.
-                    if (CarriesId(e) && e.BookingId <= lastId) continue;
+                    if (e is LiveBookingEventDto b && CarriesId(b) && b.BookingId <= lastId) continue;
                     await SendAsync(e, ct);
                 }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -91,10 +92,10 @@ public class LiveController(LiveEvents live, AppDbContext db, IHostApplicationLi
     /// <summary>Only new bookings carry an ID (it is what a reconnect resumes from); changes to older ones don't.</summary>
     private static bool CarriesId(LiveBookingEventDto e) => e.Type is "booking.created" or "booking.rescheduled";
 
-    private async Task SendAsync(LiveBookingEventDto e, CancellationToken ct)
+    private async Task SendAsync(ILiveEvent e, CancellationToken ct)
     {
-        var idLine = CarriesId(e) ? $"id: {e.BookingId}\n" : "";
-        await WriteAsync($"{idLine}event: {e.Type}\ndata: {JsonSerializer.Serialize(e, JsonSerializerOptions.Web)}\n\n", ct);
+        var idLine = e is LiveBookingEventDto b && CarriesId(b) ? $"id: {b.BookingId}\n" : "";
+        await WriteAsync($"{idLine}event: {e.Type}\ndata: {JsonSerializer.Serialize(e, e.GetType(), JsonSerializerOptions.Web)}\n\n", ct);
     }
 
     private async Task WriteAsync(string text, CancellationToken ct)

@@ -383,6 +383,44 @@ public class BotTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task A_message_to_the_bot_is_pushed_live_with_the_sender_but_not_the_text()
+    {
+        var (admin, bot, t) = await SetUpAsync();
+        var number = await SavedAsync(bot, "Messaging Customer", [t[0]]);
+
+        using var stream = await admin.GetAsync("/api/live/stream", HttpCompletionOption.ResponseHeadersRead);
+        using var reader = new StreamReader(await stream.Content.ReadAsStreamAsync());
+        var live = factory.Services.GetRequiredService<LiveEvents>();
+        for (var i = 0; i < 50 && live.SubscriberCount == 0; i++) await Task.Delay(50);
+
+        var known = await DataAsync<BotMessageResultDto>(await bot.PostAsJsonAsync("/api/bot/messages", new BotMessageRequest(number)));
+        Assert.Equal("Messaging Customer", known.CustomerName);
+        var unknown = await DataAsync<BotMessageResultDto>(await bot.PostAsJsonAsync("/api/bot/messages", new BotMessageRequest(Number())));
+        Assert.Null(unknown.CustomerId);
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var events = new List<JsonElement>();
+        var next = false;
+        while (events.Count < 2)
+        {
+            var line = await reader.ReadLineAsync(timeout.Token);
+            if (line == "event: message.received") next = true;
+            else if (next && line!.StartsWith("data:"))
+            {
+                events.Add(JsonDocument.Parse(line["data:".Length..]).RootElement);
+                next = false;
+            }
+        }
+        Assert.Equal(known.CustomerId, events[0].GetProperty("customerId").GetInt32());
+        Assert.Equal("Messaging Customer", events[0].GetProperty("customerName").GetString());
+        Assert.StartsWith("+971 50", events[0].GetProperty("whatsApp").GetString());
+        Assert.False(events[0].TryGetProperty("text", out _));
+        Assert.Equal(JsonValueKind.Null, events[1].GetProperty("customerName").ValueKind);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await bot.PostAsJsonAsync("/api/bot/messages", new BotMessageRequest("not a number"))).StatusCode);
+    }
+
+    [Fact]
     public async Task A_reconnecting_screen_catches_up_on_bookings_it_missed()
     {
         var (admin, bot, t) = await SetUpAsync();

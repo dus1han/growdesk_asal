@@ -6,7 +6,8 @@ This guide is for the developer connecting a WhatsApp chatbot to the clinic's CR
 - list the treatments a customer can choose;
 - find free consultation times on a day;
 - book a consultation;
-- look up, move, change or cancel a customer's booking.
+- look up, move, change or cancel a customer's booking;
+- tell the clinic's staff that a new WhatsApp message has arrived.
 
 The bot only sends what the customer said or chose. The WhatsApp BOT API applies all the clinic's rules:
 
@@ -409,9 +410,44 @@ What the API does:
 
 To move a booking to another time, use `PATCH` (section 9) instead of cancelling and booking again.
 
-## 11. A typical conversation
+## 11. New message alert: `POST /messages`
 
-1. **A new message arrives.** Call `POST /customers` with the contact's name and number, and the treatment they ask about once you know it. They are now an interested customer.
+Call this each time a WhatsApp message reaches the bot. The clinic's open CRM screens then show a **New message** card with the sender's number, and their name if they are a saved customer. Staff can open the customer or book a consultation from the card.
+
+Send only the number. Don't send the message itself: it isn't shown or stored.
+
+```http
+POST /api/bot/messages
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+
+{ "whatsapp": "+971501234567" }
+```
+
+```json
+{
+  "success": true,
+  "data": { "customerId": 1052, "customerName": "Sarah Fernando" },
+  "message": null,
+  "errors": null
+}
+```
+
+`customerId` and `customerName` are `null` when the number isn't a saved customer yet. The call doesn't create or change a customer; use `POST /customers` (section 4) for that.
+
+| Answer | When |
+|---|---|
+| 400 | The WhatsApp number is missing or invalid |
+
+Notes:
+
+- The alert only reaches screens that are open at that moment. It is not kept for later.
+- Several messages in a row from the same number show as one card with a count, so you can call this for every message.
+- Don't wait for this call before replying to the customer. If it fails, carry on with the conversation.
+
+## 12. A typical conversation
+
+1. **A new message arrives.** Call `POST /messages` with the number so the clinic sees it (do this for every message). Call `POST /customers` with the contact's name and number, and the treatment they ask about once you know it. They are now an interested customer.
 2. **The customer asks for a treatment.** Match it to `GET /treatments`. If it's a new interest, call `POST /customers` again to add it.
 3. **The customer suggests a day.** Call `GET /availability?date=…` and offer a few `freeTimes`.
 4. **The customer picks a time.** Call `POST /bookings`:
@@ -425,13 +461,13 @@ To move a booking to another time, use `PATCH` (section 9) instead of cancelling
     - Keep the new `bookingId` from the reply.
 6. **The customer wants to cancel.** Call `GET /bookings?whatsapp=…` to find the booking, confirm which one with the customer, then call `POST /bookings/{bookingId}/cancel`.
 
-## 12. Limits
+## 13. Limits
 
 - **Token requests:** 10 per minute.
 - **Other calls:** 120 per minute from the same server.
 - **Over the limit:** the API answers **429**. Wait a minute before retrying.
 
-## 13. Quick test with curl
+## 14. Quick test with curl
 
 ```bash
 API=http://169.58.92.105:3110/api/bot

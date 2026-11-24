@@ -2,10 +2,13 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, Bot, CalendarClock, X } from "lucide-react";
+import { ArrowRight, Bot, CalendarClock, CalendarPlus, MessageCircle, X } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BookingDetailsDrawer } from "@/components/bookings/booking-details-drawer";
+import { BookingFormDrawer, type BookingPrefill } from "@/components/bookings/booking-form-drawer";
 import { formatTime } from "@/components/bookings/booking-status";
+import { WhatsAppLink } from "@/components/customers/whatsapp-link";
 import { playChime, showDesktopAlert, unlockSound } from "@/lib/live-alerts";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +26,27 @@ interface LiveBookingEvent {
   source: string;
   createdAt: string;
 }
+
+/** A WhatsApp message just reached the bot: who it is from, never what it says (backend LiveMessageEventDto). */
+interface LiveMessageEvent {
+  type: "message.received";
+  customerId: number | null;
+  /** Null when the number isn't a saved customer. */
+  customerName: string | null;
+  whatsApp: string;
+  source: string;
+  receivedAt: string;
+}
+
+/** One card per sender: later messages from the same number update it instead of stacking. */
+interface MessageCard extends LiveMessageEvent {
+  count: number;
+  /** Changes on each message, so the card restarts its countdown. */
+  stamp: number;
+}
+
+/** A sender writing several messages in a row chimes once, not once per message. */
+const MESSAGE_CHIME_GAP_MS = 30_000;
 
 const EVENT_TYPES = ["booking.created", "booking.rescheduled", "booking.cancelled", "booking.updated"] as const;
 const SHOW_MS = 10_000;
@@ -42,15 +66,17 @@ export function LiveBookings() {
   const [openId, setOpenId] = useState<number | null>(null);
   const visible = usePageVisible();
   const [unseen, setUnseen] = useState(0);
+  const [messages, setMessages] = useState<MessageCard[]>([]);
+  const [booking, setBooking] = useState<BookingPrefill | null>(null);
 
-  // While GrowDesk is in a background tab, the tab title counts what arrived: "(2) New booking – …".
+  // While GrowDesk is in a background tab, the tab title counts what arrived: "(2) New – …".
   useEffect(() => {
     const strip = (t: string) => t.replace(TITLE_PREFIX, "");
     if (visible) {
       setUnseen(0); // eslint-disable-line react-hooks/set-state-in-effect -- seen once the tab is shown
       document.title = strip(document.title);
     } else if (unseen > 0) {
-      document.title = `(${unseen}) New booking – ${strip(document.title)}`;
+      document.title = `(${unseen}) New – ${strip(document.title)}`;
     }
   }, [visible, unseen]);
 
@@ -82,10 +108,33 @@ export function LiveBookings() {
       }
     };
 
+    const lastChime = new Map<string, number>();
+    const onMessage = (e: MessageEvent<string>) => {
+      let evt: LiveMessageEvent;
+      try {
+        evt = JSON.parse(e.data) as LiveMessageEvent;
+      } catch {
+        return;
+      }
+      setMessages((c) => {
+        const prev = c.find((x) => x.whatsApp === evt.whatsApp);
+        const card: MessageCard = { ...evt, count: (prev?.count ?? 0) + 1, stamp: Date.now() };
+        return [card, ...c.filter((x) => x.whatsApp !== evt.whatsApp)].slice(0, MAX_CARDS);
+      });
+      if (document.visibilityState !== "visible") setUnseen((n) => n + 1);
+      const now = Date.now();
+      if (now - (lastChime.get(evt.whatsApp) ?? 0) < MESSAGE_CHIME_GAP_MS) return;
+      lastChime.set(evt.whatsApp, now);
+      playChime();
+      const from = evt.customerName ? `${evt.customerName} · ${evt.whatsApp}` : evt.whatsApp;
+      showDesktopAlert(`New WhatsApp message · ${evt.source}`, from, () => {});
+    };
+
     const connect = () => {
       // The browser resends the last event ID on its own reconnects; a fresh EventSource needs it in the URL.
       source = new EventSource(lastId ? `/api/live/stream?lastEventId=${encodeURIComponent(lastId)}` : "/api/live/stream");
       for (const type of EVENT_TYPES) source.addEventListener(type, onEvent as EventListener);
+      source.addEventListener("message.received", onMessage as EventListener);
       // Sent on connect: the latest booking ID, so a reconnect catches up on what it missed.
       source.addEventListener("ready", ((e: MessageEvent<string>) => {
         if (e.lastEventId) lastId = e.lastEventId;
@@ -108,6 +157,7 @@ export function LiveBookings() {
     };
   }, [qc]);
 
+  const dismissMessage = useCallback((whatsApp: string) => setMessages((c) => c.filter((x) => x.whatsApp !== whatsApp)), []);
   const dismiss = useCallback((bookingId: number) => setCards((c) => c.filter((x) => x.bookingId !== bookingId)), []);
 
   return (
@@ -117,6 +167,17 @@ export function LiveBookings() {
         aria-live="polite"
       >
         <AnimatePresence initial={false}>
+          {messages.map((m) => (
+            <LiveMessageCard
+              key={`msg-${m.whatsApp}`}
+              message={m}
+              onClose={() => dismissMessage(m.whatsApp)}
+              onBook={(customer) => {
+                setBooking({ customer });
+                dismissMessage(m.whatsApp);
+              }}
+            />
+          ))}
           {cards.map((card) => (
             <LiveBookingCard
               key={card.bookingId}
@@ -131,6 +192,7 @@ export function LiveBookings() {
         </AnimatePresence>
       </div>
       <BookingDetailsDrawer bookingId={openId} onClose={() => setOpenId(null)} onBookingChange={setOpenId} />
+      <BookingFormDrawer open={booking !== null} onClose={() => setBooking(null)} prefill={booking ?? undefined} />
     </>
   );
 }
@@ -147,7 +209,7 @@ function shortDate(iso: string) {
   });
 }
 
-const TITLE_PREFIX = /^\(\d+\) New booking – /;
+const TITLE_PREFIX = /^\(\d+\) New – /;
 
 /** True while this browser tab is the one being shown. */
 function usePageVisible() {
@@ -264,6 +326,111 @@ function LiveBookingCard({ booking, onClose, onOpen }: { booking: LiveBookingEve
           View booking
           <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
         </button>
+      </div>
+    </motion.div>
+  );
+}
+
+function LiveMessageCard({
+  message,
+  onClose,
+  onBook,
+}: {
+  message: MessageCard;
+  onClose: () => void;
+  onBook: (customer: { id: number; name: string }) => void;
+}) {
+  const reduced = useReducedMotion();
+  const [hovered, setHovered] = useState(false);
+  const visible = usePageVisible();
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  }, [onClose]);
+
+  // Same timing as the booking card; another message from this number starts the countdown again.
+  useEffect(() => {
+    if (hovered || !visible) return;
+    const t = setTimeout(() => close.current(), SHOW_MS);
+    return () => clearTimeout(t);
+  }, [hovered, visible, message.stamp]);
+
+  const known = message.customerId !== null && message.customerName !== null;
+
+  return (
+    <motion.div
+      layout={!reduced}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, x: 380, scale: 0.96 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={reduced ? { opacity: 0 } : { opacity: 0, x: 380, transition: { duration: 0.25, ease: [0.55, 0, 1, 0.45] } }}
+      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
+      role="status"
+      className="pointer-events-auto overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_24px_48px_-16px_rgb(15_23_42/0.28)]"
+    >
+      <div className="h-1 bg-gradient-to-r from-[#25d366] via-emerald-400 to-brand" aria-hidden />
+      <div className="p-4">
+        <div className="flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.07em] text-[#128c7e]">
+            <MessageCircle className="size-3.5" />
+            New message · {message.source}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex size-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="mt-3 flex items-center gap-3">
+          <span className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-[#25d366]/12 text-sm font-semibold text-[#128c7e]">
+            {known ? initials(message.customerName!) : <MessageCircle className="size-4" />}
+            {message.count > 1 && (
+              <motion.span
+                key={message.count}
+                initial={reduced ? false : { scale: 0.6 }}
+                animate={{ scale: 1 }}
+                className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-[#25d366] px-1 text-[10.5px] font-bold text-white ring-2 ring-surface"
+                aria-label={`${message.count} messages`}
+              >
+                {message.count}
+              </motion.span>
+            )}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="truncate text-[15px] font-semibold">{known ? message.customerName : "Not saved yet"}</span>
+              {!known && <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">New</span>}
+            </span>
+            <WhatsAppLink number={message.whatsApp} className="mt-0.5 text-xs text-muted" />
+          </span>
+        </div>
+
+        {known && (
+          <div className="mt-3.5 flex gap-2">
+            <Link
+              href={`/customers/${message.customerId}`}
+              onClick={onClose}
+              className="inline-flex flex-1 items-center justify-center rounded-xl border border-line px-3 py-2 text-sm font-semibold transition-colors hover:bg-surface-muted"
+            >
+              Customer
+            </Link>
+            <button
+              type="button"
+              onClick={() => onBook({ id: message.customerId!, name: message.customerName! })}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-strong"
+            >
+              <CalendarPlus className="size-4" />
+              Book
+            </button>
+          </div>
+        )}
       </div>
     </motion.div>
   );

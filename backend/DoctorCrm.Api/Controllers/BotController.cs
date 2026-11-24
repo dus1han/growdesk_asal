@@ -51,6 +51,14 @@ public class BotController(CaptureClientService clients, BotService bot) : Contr
         return Ok(ApiResponse<BotLeadResultDto>.Ok(result, result.Action == "created" ? $"{result.CustomerName} was added." : $"{result.CustomerName} was updated."));
     }
 
+    /// <summary>
+    /// Tells the clinic's open GrowDesk screens that a WhatsApp message just arrived from this number.
+    /// Send only the number: the message itself is not sent or stored.
+    /// </summary>
+    [HttpPost("messages")]
+    public async Task<ActionResult<ApiResponse<BotMessageResultDto>>> Message(BotMessageRequest request, CancellationToken ct) =>
+        Ok(ApiResponse<BotMessageResultDto>.Ok(await bot.MessageReceivedAsync(request, ct)));
+
     /// <summary>The customer's upcoming booked consultations.</summary>
     [HttpGet("bookings")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<BotBookingDto>>>> Bookings([FromQuery] string? whatsapp, CancellationToken ct) =>

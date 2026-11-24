@@ -59,7 +59,19 @@ public record BotBookingResultDto(string Action, BotBookingDto Booking, int? Pre
 /// <summary>Returned with a 409 when the requested time is taken: other free times that day.</summary>
 public record BotSlotTakenDto(string Date, string RequestedTime, IReadOnlyList<string> FreeTimes);
 
+/// <summary>A WhatsApp message the bot just received: only the sender's number, never the message itself.</summary>
+public record BotMessageRequest(string? WhatsApp);
+
+/// <summary><c>CustomerId</c> is null when the number isn't a saved customer yet.</summary>
+public record BotMessageResultDto(int? CustomerId, string? CustomerName);
+
 // ---- Live updates (GrowDesk screens) ------------------------------------------------------------
+
+/// <summary>Anything pushed to open GrowDesk screens; <c>Type</c> is the Server-Sent Events event name.</summary>
+public interface ILiveEvent
+{
+    string Type { get; }
+}
 
 /// <summary>Pushed to open GrowDesk screens when the bot books or moves a consultation.</summary>
 public record LiveBookingEventDto(
@@ -73,7 +85,20 @@ public record LiveBookingEventDto(
     TimeOnly EndTime,
     IReadOnlyList<string> Treatments,
     string Source,
-    DateTime CreatedAt);
+    DateTime CreatedAt) : ILiveEvent;
+
+/// <summary>
+/// Pushed to open GrowDesk screens when a WhatsApp message reaches the bot ("message.received").
+/// <c>CustomerId</c> is null for a number that isn't a saved customer. Not stored: a screen that
+/// is offline at that moment doesn't see it. <c>CustomerName</c> is null for an unsaved number.
+/// </summary>
+public record LiveMessageEventDto(
+    string Type,
+    int? CustomerId,
+    string? CustomerName,
+    string WhatsApp,
+    string Source,
+    DateTime ReceivedAt) : ILiveEvent;
 
 // ---- Calendar: opening hours and blocked time ----------------------------------------------------
 

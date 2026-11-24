@@ -12,12 +12,12 @@ namespace DoctorCrm.Api.Services;
 /// </summary>
 public class LiveEvents
 {
-    private readonly ConcurrentDictionary<Guid, Channel<LiveBookingEventDto>> _subscribers = new();
+    private readonly ConcurrentDictionary<Guid, Channel<ILiveEvent>> _subscribers = new();
 
-    public (Guid Id, ChannelReader<LiveBookingEventDto> Reader) Subscribe()
+    public (Guid Id, ChannelReader<ILiveEvent> Reader) Subscribe()
     {
         // A stalled screen drops its oldest events instead of holding memory; it catches up on reconnect.
-        var channel = Channel.CreateBounded<LiveBookingEventDto>(new BoundedChannelOptions(50) { FullMode = BoundedChannelFullMode.DropOldest });
+        var channel = Channel.CreateBounded<ILiveEvent>(new BoundedChannelOptions(50) { FullMode = BoundedChannelFullMode.DropOldest });
         var id = Guid.NewGuid();
         _subscribers[id] = channel;
         return (id, channel.Reader);
@@ -28,7 +28,7 @@ public class LiveEvents
         if (_subscribers.TryRemove(id, out var channel)) channel.Writer.TryComplete();
     }
 
-    public void Publish(LiveBookingEventDto evt)
+    public void Publish(ILiveEvent evt)
     {
         foreach (var channel in _subscribers.Values) channel.Writer.TryWrite(evt);
     }
