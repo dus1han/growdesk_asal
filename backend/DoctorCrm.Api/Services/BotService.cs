@@ -220,7 +220,7 @@ public class BotService(
             .ToListAsync(ct);
 
     /// <summary>
-    /// A WhatsApp message reached the bot: tells open GrowDesk screens who it is from (the number,
+    /// A WhatsApp message reached the bot: on the first message of a conversation, tells open GrowDesk screens who it is from (the number,
     /// and the name when it is a saved customer). Nothing is stored and the customer is not changed.
     /// </summary>
     public async Task<BotMessageResultDto> MessageReceivedAsync(BotMessageRequest r, CancellationToken ct)
@@ -228,9 +228,13 @@ public class BotService(
         var number = Phone(r.WhatsApp);
         var customer = await db.Customers.AsNoTracking().Where(c => c.WhatsAppNumber == number)
             .Select(c => new { c.Id, c.Name }).FirstOrDefaultAsync(ct);
-        live.Publish(new LiveMessageEventDto("message.received", customer?.Id, customer?.Name,
-            ContactNormalizer.FormatPhone(number), SourceName, DateTime.UtcNow));
-        return new BotMessageResultDto(customer?.Id, customer?.Name);
+        var now = DateTime.UtcNow;
+        // One alert per conversation, not per message.
+        var alerted = live.StartsConversation(number, now);
+        if (alerted)
+            live.Publish(new LiveMessageEventDto("message.received", customer?.Id, customer?.Name,
+                ContactNormalizer.FormatPhone(number), SourceName, now));
+        return new BotMessageResultDto(customer?.Id, customer?.Name, alerted);
     }
 
     /// <summary>Tells open GrowDesk screens. A failure here must never fail the bot's request: the booking is saved.</summary>

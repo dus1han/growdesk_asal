@@ -62,8 +62,12 @@ public record BotSlotTakenDto(string Date, string RequestedTime, IReadOnlyList<s
 /// <summary>A WhatsApp message the bot just received: only the sender's number, never the message itself.</summary>
 public record BotMessageRequest(string? WhatsApp);
 
-/// <summary><c>CustomerId</c> is null when the number isn't a saved customer yet.</summary>
-public record BotMessageResultDto(int? CustomerId, string? CustomerName);
+/// <summary>
+/// <c>CustomerId</c> is null when the number isn't a saved customer yet. <c>Alerted</c> is true when
+/// this message started a conversation and the clinic's screens were alerted; later messages in the
+/// same conversation (no 30-minute gap) don't alert again.
+/// </summary>
+public record BotMessageResultDto(int? CustomerId, string? CustomerName, bool Alerted);
 
 // ---- Live updates (GrowDesk screens) ------------------------------------------------------------
 
